@@ -158,6 +158,26 @@ one part of the model where state genuinely transitions. Replaced with an
 append-only log of `HoldEvent` transitions, with the current state derived as
 the last transition on or before a given day.
 
+**Single-entry postings.** The first working ledger posted one signed entry
+per event: a credit to a customer account came from nowhere and a fee debited
+the customer without crediting anything. Every customer-facing number in this
+repository was already correct at that point, which is exactly what made it
+worth changing — the balances were right and the book could not be *proved*
+right. There was no trial balance, no way to see where the force-posted 180.00
+had gone, and §2 of the architecture document was discussing reconciliation
+against a general ledger that this design had no structure to reconcile with.
+Replaced with validated two-sided postings and a minimal chart. The customer
+balances did not move; the difference is that now they cannot silently drift.
+
+**Appending postings one at a time.** The natural way to write the double-entry
+change was to keep the existing `_post` and call it twice. Rejected: an event
+that raises between its two legs would leave a one-sided entry in an
+append-only log, where nothing can remove it. The commit path buffers the
+postings, validates that they sum to zero in every currency, and only then
+appends — so an unbalanced transaction leaves no trace rather than half of
+one. It also happens to be the seam a `Transaction` record needs later, which
+made the more careful version the cheaper one.
+
 **`Decimal` for money.** Dropped in favour of `int` minor units plus `Fraction`
 for intermediate interest. `Decimal` carries a context — precision and rounding
 mode set outside the ledger, at import time, by whoever got there first — and

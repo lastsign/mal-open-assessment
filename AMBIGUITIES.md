@@ -431,3 +431,43 @@ at an arbitrary past Hijri date. That last requirement is one this design
 happens to meet well — a value-dated append-only log answers "what was the
 balance on any past date" natively, where a mutable balance column cannot
 answer it at all.
+
+---
+
+## A22. Where does the other side of a plain credit or debit go?
+
+**The gap.** The brief names two customer accounts and describes credits and
+debits against them. It never says what the money is moving *to* or *from* —
+which is the question double-entry forces and single-entry lets you dodge.
+
+**Resolution.** A minimal chart, chosen so that every event balances and no
+more: one clearing account per currency taking the other side of ordinary
+credits, debits and matched settlements; a suspense account for the unmatched
+force post; a fee income account; and an interest expense account per
+currency. Nothing in the ledger may post one-sided, and a missing contra
+account raises `NoSuchAccount` rather than being improvised around.
+
+**The one choice inside that worth defending.** The force post's other side
+goes to **suspense, not clearing.** Both are defensible: the scheme has been
+paid, so an argument exists for treating it as ordinary clearing. Suspense
+wins because the position is genuinely unreconciled — we have taken 180.00
+from a customer against an authorisation we have no record of — and parking it
+somewhere named makes it a balance an operator can see and age. Folded into
+clearing it disappears into a large, busy account. This is also what REJECTED
+.md said should happen to a force post, so the chart now implements the
+argument rather than merely asserting it.
+
+**What is still missing.** These are contra accounts, not a chart of accounts:
+no account lifecycle, no posting-rule templates, no general ledger mapping.
+Enumerated in §4 of the architecture document.
+
+---
+
+## A23. Is a hold a posting?
+
+**The gap.** Stated only indirectly — a hold moves available balance, not
+ledger balance.
+
+**Resolution.** No. An authorisation posts nothing at all and lives entirely
+in the hold log. It is the one event type in the model that produces no
+entries, which is why it is also the one that cannot unbalance the book.

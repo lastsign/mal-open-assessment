@@ -82,6 +82,20 @@ independent roundings — they sum to it exactly, by construction. Day 4's exact
 accrual is 0.0940 and appears as 0.10 because that is where the remainder was
 placed. See AMBIGUITIES A5.
 
+```
+Trial balance at end of Day 6
+  ACC-001                     210.70 AED
+  SUSPENSE-AED                180.00 AED
+  INCOME-FEES-AED              75.00 AED
+  sum of all AED accounts        0.00 AED
+```
+
+Finally the whole book, per account and then summed. Postings are double-entry,
+so every currency must cancel to zero; if a line here is non-zero the ledger is
+broken and the tests say so before the report does. `SUSPENSE-AED` holds the
+force-posted settlement that matched no authorisation — an unreconciled
+position, deliberately parked somewhere an operator can see it.
+
 ## The failing test
 
 `tests/test_known_gap.py` fails on purpose and carries its explanation inline.
@@ -102,7 +116,7 @@ toolchain).
 ```
 ledger/money.py    Money as integer minor units; exact allocation and apportionment
 ledger/events.py   The input stream: booking day and value date, kept separate
-ledger/core.py     The append-only log and every view derived from it
+ledger/core.py     The append-only log, the chart, and every view derived from it
 ledger/replay.py   The six-day replay and the report
 tests/             Primitives, the replay, one test per criterion, and the gap
 doc/               Architecture & trade-offs document (LaTeX source and PDF)

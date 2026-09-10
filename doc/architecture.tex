@@ -26,7 +26,7 @@
 
 \title{\vspace{-8mm}\textbf{\large In-Memory Account Ledger Core}\\[2pt]
 \normalsize Architecture and Trade-offs}
-\author{\normalsize Dmitry Bannikov}
+\author{\normalsize Dmitrii Bannikov}
 \date{\normalsize 10 September 2026}
 
 \begin{document}
@@ -289,13 +289,18 @@ original amount added back.
         matching audit order, which quietly destroys the one property the whole
         design rests on. Production needs a single writer per account or an
         explicit ordering service --- not a lock added later.
-  \item[Fees derived rather than event-sourced.] Fee assessment recomputes from
-        current balances instead of being an event carrying the as-of watermark
-        it was computed against. This is the flaw the failing test documents:
-        identical entries yield different fees depending on arrival order, so
-        any rebuild or replica that re-derives fees disagrees with production.
-        Deferred risk is a reconciliation break that appears only in disaster
-        recovery, which is the worst time to find it.
+  \item[Fees derived rather than event-sourced, and the close is not a job.]
+        Fee assessment recomputes from current balances instead of being an
+        event carrying the as-of watermark it was computed against, and the
+        day close is a method call rather than a run with an identity, a
+        status and a resume point. These are one defect seen from two sides:
+        it is the flaw the failing test documents --- identical entries yield
+        different fees depending on arrival order --- and it is also why a
+        close that dies halfway leaves fees half-assessed with no record that
+        it was attempted. Making each assessment an event attributable to a
+        recorded run fixes both. Deferred risk is a reconciliation break that
+        surfaces only in disaster recovery, which is the worst time to find
+        it.
   \item[No actor identity on any event.] Nothing records who booked an entry or
         chose its value date. This defers exactly the control \S2 depends on:
         four-eyes approval is unimplementable on a model that has no notion of
@@ -325,6 +330,30 @@ original amount added back.
         the log the single source of truth while the design was still moving.
         Deferred risk is \S1 in full.
 \end{description}
+
+Beyond those, the postings are double-entry and the book proves it --- every
+transaction sums to zero per currency before anything is appended, and a trial
+balance cancels on every day --- but a ledger \term{core} in production is
+wider than that, and the rest is absent by choice rather than by oversight.
+There is no \term{transaction} record grouping postings into a journal entry
+with its own identity, only the event id they share; the chart is the minimum
+that lets each event balance, with no account lifecycle (open, closed, frozen,
+dormant) and no posting-rule templates, so what debits what is written into
+handlers rather than configured; only two balance types exist where production
+tracks booked, available, cleared, blocked and pending; there is no accounting
+period, closing entry or statement generation; no reconciliation against an
+external clearing file and no ageing of the suspense position the force post
+creates; no dispute or chargeback lifecycle, so everything after settlement is
+out of scope; no limits or velocity checks beyond the available-balance test;
+and nothing is published outbound, so no downstream system can learn that any
+of this happened.
+
+Each of those is a day of work rather than a rethink, which is why they are
+cuts and not risks --- with one exception. The transaction record is the one I
+designed \term{for}: the commit path buffers postings, validates them as a set
+and appends them together, so adding an identity to that unit is an addition
+rather than a migration. The others would each need a decision I was not given
+enough to make.
 
 
 \section*{Sources}

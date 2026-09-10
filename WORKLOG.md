@@ -113,6 +113,54 @@ the market. Also created SOURCES.md, which separates what I actually consulted
 from what I asserted from memory — the peg rates and the working-week change
 are in the second list and are quoted nowhere that matters.
 
+**16:00 — complexity gate, and it earned its place immediately.**
+Added complexipy (cognitive) and radon (McCabe) behind `make complexity`, kept
+out of `make test` so the suite stays dependency-free. It failed on the first
+run: `render()` scored 48 cognitive against a threshold of 15, and 26
+cyclomatic — grade D. Everything else was clean, average A.
+
+Committed the gate red, deliberately, then fixed it in the next commit, so the
+history shows the tool finding the problem rather than me claiming it did.
+Split `render()` into six per-section helpers; cognitive went 48 to 2. Verified
+the report output is byte-identical under both policies by diffing before and
+after, and added `tests/test_report.py` so the split stays safe to repeat.
+
+**16:11 — double-entry, and a bug it turned up on the way.**
+The gap I had been circling: the ledger was single-entry. A credit came from
+nowhere, a fee debited the customer and credited nothing, and §2 of the
+architecture document was discussing reconciliation against a general ledger
+that the design had no structure to reconcile with. Every customer-facing
+number was already right — which is what made it worth fixing, because right
+and *provably* right are different claims.
+
+Built the commit path as buffer, validate, append rather than posting each leg
+as it is produced. Two reasons, and the second is the one I would give first:
+an event that raises between its legs must not leave a one-sided entry in a
+log that cannot delete; and grouping plus validating the set is most of what a
+`Transaction` record needs, so the later change becomes an addition rather
+than a migration. Deciding that now cost nothing; deciding it later would have
+cost every handler.
+
+The force post's other side goes to suspense rather than clearing. Both
+defensible — the scheme has been paid — but suspense makes the unreconciled
+180.00 a balance someone can see and age, which is what REJECTED.md already
+said should happen. The chart now implements the argument instead of asserting
+it.
+
+Bug found while doing this, predating it: Day 6 was reported as "restated by
+backdated entries". Nothing was backdated — interest capitalises after
+`close_day(6)`, so the snapshot was taken before the credit existed and the
+report misdescribed how the money got there. Fixed in its own commit, before
+the double-entry work, so the history shows it as the separate thing it is.
+
+Eight existing tests failed on the first run, all of them implicitly
+single-entry: they counted entries and now saw both legs. Updated to filter to
+the customer leg, and added `tests/test_double_entry.py` — every transaction
+sums to zero per currency, the whole book cancels on every day under both
+policies, an unbalanced commit is refused before anything is appended, and a
+chart with nowhere to post the other side fails loudly rather than posting
+one-sided.
+
 ---
 
 ## Still to do
