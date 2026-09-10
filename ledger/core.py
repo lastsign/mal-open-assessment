@@ -7,10 +7,11 @@ the log, never stored as a field that could drift from it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from fractions import Fraction
-from typing import Final, Iterable, Literal, Mapping
+from typing import Final, Literal
 
 from ledger.events import (
     Authorization,
@@ -30,7 +31,7 @@ from ledger.money import (
     round_half_up,
 )
 
-OVERDRAFT_FEE: Final = Money(2500, AED)
+OVERDRAFT_FEE: Final = Money(2500, AED) # amount in minor units
 DAILY_INTEREST_RATE: Final = Fraction(4, 10_000)  # 0.04% per day
 
 
@@ -122,13 +123,22 @@ class Ledger:
         note: str = "",
     ) -> Entry:
         entry = Entry(
-            self._next_seq(), event_id, account, amount, value_date, booked_day, kind, note
+            self._next_seq(),
+            event_id,
+            account,
+            amount,
+            value_date,
+            booked_day,
+            kind,
+            note,
         )
         self._entries.append(entry)
         return entry
 
     def _decide(self, event_id: str, day: Day, outcome: Outcome, reason: str) -> None:
-        self._decisions.append(Decision(self._next_seq(), event_id, day, outcome, reason))
+        self._decisions.append(
+            Decision(self._next_seq(), event_id, day, outcome, reason)
+        )
 
     @property
     def entries(self) -> tuple[Entry, ...]:
@@ -137,6 +147,21 @@ class Ledger:
     @property
     def decisions(self) -> tuple[Decision, ...]:
         return tuple(self._decisions)
+
+    @property
+    def holds(self) -> tuple[HoldEvent, ...]:
+        return tuple(self._holds)
+
+    def authorisation_ids(self, day: Day) -> list[str]:
+        """Every authorisation the ledger knows of as of `day`, in order."""
+        return sorted({e.auth_id for e in self._holds if e.day <= day})
+
+    def hold_amount(self, auth_id: str) -> Money:
+        """The amount the authorisation was opened for."""
+        return next(e for e in self._holds if e.auth_id == auth_id).amount
+
+    def fees_on(self, day: Day) -> list[Entry]:
+        return [e for e in self._entries if e.kind == "FEE" and e.value_date == day]
 
     # ------------------------------------------------------------- views
 
@@ -158,7 +183,9 @@ class Ledger:
     def active_holds(self, account: str, day: Day | None = None) -> Money:
         total = Money.zero(self._accounts[account])
         seen: set[str] = {
-            e.auth_id for e in self._holds if e.account == account and (day is None or e.day <= day)
+            e.auth_id
+            for e in self._holds
+            if e.account == account and (day is None or e.day <= day)
         }
         for auth_id in seen:
             if self.hold_state(auth_id, day) == "ACTIVE":
@@ -180,8 +207,12 @@ class Ledger:
                 self._on_credit(event)
             case Debit():
                 self._post(
-                    event.event_id, event.account, -event.amount,
-                    event.value_date, event.booked_day, "DEBIT",
+                    event.event_id,
+                    event.account,
+                    -event.amount,
+                    event.value_date,
+                    event.booked_day,
+                    "DEBIT",
                 )
             case Authorization():
                 self._on_authorization(event)
@@ -192,30 +223,55 @@ class Ledger:
 
     def _on_credit(self, event: Credit) -> None:
         for i, part in enumerate(allocate(event.amount, event.instalments), start=1):
-            note = f"instalment {i}/{event.instalments}" if event.instalments > 1 else ""
+            note = (
+                f"instalment {i}/{event.instalments}" if event.instalments > 1 else ""
+            )
             self._post(
-                event.event_id, event.account, part,
-                event.value_date, event.booked_day, "CREDIT", note,
+                event.event_id,
+                event.account,
+                part,
+                event.value_date,
+                event.booked_day,
+                "CREDIT",
+                note,
             )
 
     def _on_authorization(self, event: Authorization) -> None:
-        projected = self.available_balance(event.account, event.value_date) - event.amount
+        projected = (
+            self.available_balance(event.account, event.value_date) - event.amount
+        )
         if projected.is_negative:
             self._holds.append(
-                HoldEvent(self._next_seq(), event.auth_id, event.account,
-                          event.value_date, "DECLINED", event.amount)
+                HoldEvent(
+                    self._next_seq(),
+                    event.auth_id,
+                    event.account,
+                    event.value_date,
+                    "DECLINED",
+                    event.amount,
+                )
             )
             self._decide(
-                event.event_id, event.booked_day, "DECLINED",
+                event.event_id,
+                event.booked_day,
+                "DECLINED",
                 f"available {self.available_balance(event.account, event.value_date)} "
                 f"would fall to {projected}",
             )
             return
         self._holds.append(
-            HoldEvent(self._next_seq(), event.auth_id, event.account,
-                      event.value_date, "ACTIVE", event.amount)
+            HoldEvent(
+                self._next_seq(),
+                event.auth_id,
+                event.account,
+                event.value_date,
+                "ACTIVE",
+                event.amount,
+            )
         )
-        self._decide(event.event_id, event.booked_day, "APPROVED", f"hold {event.amount}")
+        self._decide(
+            event.event_id, event.booked_day, "APPROVED", f"hold {event.amount}"
+        )
 
     def _on_settlement(self, event: Settlement) -> None:
         """Settlements are booked, never balance-checked.
@@ -228,28 +284,48 @@ class Ledger:
         state = self.hold_state(event.auth_id)
         if state is None:
             self._post(
-                event.event_id, event.account, -event.amount,
-                event.value_date, event.booked_day, "SETTLEMENT", "unmatched: force post",
+                event.event_id,
+                event.account,
+                -event.amount,
+                event.value_date,
+                event.booked_day,
+                "SETTLEMENT",
+                "unmatched: force post",
             )
             self._decide(
-                event.event_id, event.booked_day, "FORCE_POSTED",
+                event.event_id,
+                event.booked_day,
+                "FORCE_POSTED",
                 f"no authorisation {event.auth_id} in the ledger",
             )
             return
         if state != "ACTIVE":
             self._decide(
-                event.event_id, event.booked_day, "REJECTED",
+                event.event_id,
+                event.booked_day,
+                "REJECTED",
                 f"authorisation {event.auth_id} is already {state}",
             )
             return
         opened = next(e for e in self._holds if e.auth_id == event.auth_id)
         self._post(
-            event.event_id, event.account, -event.amount,
-            event.value_date, event.booked_day, "SETTLEMENT", f"settles {event.auth_id}",
+            event.event_id,
+            event.account,
+            -event.amount,
+            event.value_date,
+            event.booked_day,
+            "SETTLEMENT",
+            f"settles {event.auth_id}",
         )
         self._holds.append(
-            HoldEvent(self._next_seq(), event.auth_id, event.account,
-                      event.value_date, "SETTLED", event.amount)
+            HoldEvent(
+                self._next_seq(),
+                event.auth_id,
+                event.account,
+                event.value_date,
+                "SETTLED",
+                event.amount,
+            )
         )
         residual = opened.amount - event.amount
         reason = f"settled {event.amount} against hold {opened.amount}"
@@ -261,22 +337,33 @@ class Ledger:
         originals = [e for e in self._entries if e.event_id == event.reverses]
         if not originals:
             self._decide(
-                event.event_id, event.booked_day, "REJECTED",
+                event.event_id,
+                event.booked_day,
+                "REJECTED",
                 f"nothing booked under {event.reverses}",
             )
             return
         if any(e.note == f"reverses {event.reverses}" for e in self._entries):
             self._decide(
-                event.event_id, event.booked_day, "REJECTED",
+                event.event_id,
+                event.booked_day,
+                "REJECTED",
                 f"{event.reverses} is already reversed",
             )
             return
         for original in originals:
             self._post(
-                event.event_id, original.account, -original.amount,
-                event.value_date, event.booked_day, "REVERSAL", f"reverses {event.reverses}",
+                event.event_id,
+                original.account,
+                -original.amount,
+                event.value_date,
+                event.booked_day,
+                "REVERSAL",
+                f"reverses {event.reverses}",
             )
-        self._decide(event.event_id, event.booked_day, "REVERSED", f"contra of {event.reverses}")
+        self._decide(
+            event.event_id, event.booked_day, "REVERSED", f"contra of {event.reverses}"
+        )
 
     # ------------------------------------------------------------- close
 
@@ -298,7 +385,9 @@ class Ledger:
         }
         return booked
 
-    def _maybe_assess_fee(self, account: str, value_date: Day, booked_day: Day) -> Entry | None:
+    def _maybe_assess_fee(
+        self, account: str, value_date: Day, booked_day: Day
+    ) -> Entry | None:
         already = any(
             e.account == account and e.kind == "FEE" and e.value_date == value_date
             for e in self._entries
@@ -314,9 +403,13 @@ class Ledger:
                 f"See AMBIGUITIES.md."
             )
         return self._post(
-            account=account, event_id=f"FEE-{account}-D{value_date}",
-            amount=-OVERDRAFT_FEE, value_date=value_date, booked_day=booked_day,
-            kind="FEE", note="overdraft",
+            account=account,
+            event_id=f"FEE-{account}-D{value_date}",
+            amount=-OVERDRAFT_FEE,
+            value_date=value_date,
+            booked_day=booked_day,
+            kind="FEE",
+            note="overdraft",
         )
 
     def capitalize_interest(self, last_day: Day) -> None:
@@ -328,14 +421,19 @@ class Ledger:
         """
         for account, currency in self._accounts.items():
             exact = [
-                Fraction(max(self.closing_balance(account, day).minor, 0)) * DAILY_INTEREST_RATE
+                Fraction(max(self.closing_balance(account, day).minor, 0))
+                * DAILY_INTEREST_RATE
                 for day in range(1, last_day + 1)
             ]
             total = round_half_up(sum(exact, Fraction(0)))
             self._daily_accruals[account] = apportion(exact, total)
             if total:
                 self._post(
-                    event_id=f"INT-{account}", account=account,
-                    amount=Money(total, currency), value_date=last_day,
-                    booked_day=last_day, kind="INTEREST", note="capitalised accrual",
+                    event_id=f"INT-{account}",
+                    account=account,
+                    amount=Money(total, currency),
+                    value_date=last_day,
+                    booked_day=last_day,
+                    kind="INTEREST",
+                    note="capitalised accrual",
                 )
