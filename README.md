@@ -82,6 +82,12 @@ fees or none depending on whether a correction is booked before or after
 midnight. It is marked `xfail(strict=True)` so the suite stays green while the
 failure stays visible — `make gap` runs it unmasked.
 
+## Part 2 — architecture document
+
+`doc/architecture.tex` is the source; `doc/architecture.pdf` is the built
+three-page document that is submitted. Rebuild with `make doc` (needs a LaTeX
+toolchain).
+
 ## Layout
 
 ```
@@ -90,6 +96,7 @@ ledger/events.py   The input stream: booking day and value date, kept separate
 ledger/core.py     The append-only log and every view derived from it
 ledger/replay.py   The six-day replay and the report
 tests/             Primitives, the replay, one test per criterion, and the gap
+doc/               Architecture & trade-offs document (LaTeX source and PDF)
 ```
 
 ## Design in one paragraph

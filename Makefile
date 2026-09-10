@@ -1,4 +1,4 @@
-.PHONY: test run run-pit gap all
+.PHONY: test run run-pit gap all doc doc-clean
 
 PY ?= python3
 export PYTHONPATH := .
@@ -16,3 +16,9 @@ gap:
 	$(PY) -m pytest tests/test_known_gap.py --runxfail
 
 all: test run
+
+doc:
+	cd doc && latexmk -pdf -interaction=nonstopmode -halt-on-error architecture.tex
+
+doc-clean:
+	cd doc && latexmk -c
