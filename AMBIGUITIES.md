@@ -78,7 +78,7 @@ that runs at a close. E7 arrives on Day 5 value-dated Day 2, so the two
 readings diverge and take every number with them.
 
 **Resolution.** Both are implemented, behind `FeePolicy`, and selected in
-`close_day` (ledger/core.py:507). The default is
+`close_day` (ledger/core.py:513). The default is
 `RETROACTIVE`: when a backdated entry lands, days from that value date forward
 are re-evaluated in ascending order and any missing fee is assessed with the
 value date of the day it belongs to.
@@ -257,7 +257,7 @@ fees could not even be denominated.
 No BHD fee, no date convention and no conversion instruction is given.
 
 **Resolution.** The ledger **raises `UndefinedFeeCurrency`** rather than
-guess, in `_refuse_unchargeable_fees` (ledger/core.py:528), before any fee is
+guess, in `_refuse_unchargeable_fees` (ledger/core.py:534), before any fee is
 committed.
 It does not fire on this stream, because ACC-002 never closes negative.
 
@@ -433,7 +433,7 @@ account, not three for one day.
 interest accrues over.
 
 **Resolution.** No. All six daily accruals are computed from balances taken
-before the credit is posted — `capitalize_interest` (ledger/core.py:564).
+before the credit is posted — `capitalize_interest` (ledger/core.py:570).
 
 **Why.** Otherwise the calculation is self-referential: crediting interest
 raises the Day 6 balance, which raises the Day 6 accrual, which raises the

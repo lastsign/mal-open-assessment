@@ -104,7 +104,7 @@ settled against, and the difference lands in a suspense account for someone to
 find later. "The funds must not leave the account" describes an outcome the
 ledger has no power to produce.
 
-**What this ledger does instead** — `_force_post` (ledger/core.py:446) —
+**What this ledger does instead** — `_force_post` (ledger/core.py:452) —
 books the settlement in full, flags it
 `unmatched: force post`, and records a `FORCE_POSTED` decision so it surfaces
 in the day's errors and can be routed to exception handling. It is allowed to

@@ -258,12 +258,18 @@ class Ledger:
             note=note,
             reverses=reverses,
         )
-        self._transactions.append(transaction)
-        self._by_id[transaction.id] = transaction
-        self._entries.extend(
+        # Build everything first, mutate second. Entry construction cannot
+        # realistically fail on inputs that already passed _validate, but the
+        # docstring above promises all-or-nothing and this makes that
+        # structural rather than merely true in practice: by the time the log
+        # is touched, nothing left can raise.
+        entries = [
             Entry(self._next_seq(), transaction.id, p.account, p.amount)
             for p in postings
-        )
+        ]
+        self._transactions.append(transaction)
+        self._by_id[transaction.id] = transaction
+        self._entries.extend(entries)
         return transaction
 
     def _decide(self, event_id: str, day: Day, outcome: Outcome, reason: str) -> None:
