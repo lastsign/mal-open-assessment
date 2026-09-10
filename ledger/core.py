@@ -437,3 +437,11 @@ class Ledger:
                     kind="INTEREST",
                     note="capitalised accrual",
                 )
+        # Capitalisation is part of the last day's close, not something that
+        # arrived after it. Without this the report calls the credit a
+        # backdated restatement, which is a lie about how the money got there.
+        if last_day in self.snapshots:
+            self.snapshots[last_day] = {
+                account: self.closing_balance(account, last_day)
+                for account in self._accounts
+            }
