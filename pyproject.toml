@@ -1,0 +1,14 @@
+[project]
+name = "account-ledger-core"
+version = "0.1.0"
+description = "In-memory, append-only account ledger core"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["gap: a test that documents a known flaw in this design"]
