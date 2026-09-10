@@ -194,6 +194,51 @@ def _amount(value: Money) -> str:
     return str(value).rsplit(" ", 1)[0]
 
 
+def _accounts_by_currency(book: Ledger) -> dict[Currency, list[str]]:
+    """The chart split into currency blocks, chart order kept within each."""
+    grouped: dict[Currency, list[str]] = {}
+    for account_id, account in book.chart.items():
+        grouped.setdefault(account.currency, []).append(account_id)
+    return grouped
+
+
+def _block(book: Ledger, currency: Currency, account_ids: list[str]) -> list[tuple[str, str]]:
+    """(label, figure) for one currency's accounts, with its total last.
+
+    An internal account that never moved is omitted; a customer account is
+    always shown, even at zero, because its absence would read as an error
+    rather than as an empty account.
+    """
+    lines = [
+        (account_id, _amount(book.closing_balance(account_id, WINDOW)))
+        for account_id in account_ids
+        if book.closing_balance(account_id, WINDOW).minor != 0
+        or account_id in CUSTOMERS
+    ]
+    total = Money(book.trial_balance(WINDOW)[currency], currency)
+    return [*lines, ("sum", _amount(total))]
+
+
+def _align(lines: list[tuple[str, str]]) -> list[str]:
+    """Two columns, figures right-justified, a rule above the last row.
+
+    Widths come from the content, so a longer account name or a larger figure
+    widens the column rather than breaking the alignment.
+    """
+    label_width = max(len(label) for label, _ in lines)
+    figure_width = max(len(figure) for _, figure in lines)
+    body = [
+        f"    {label:<{label_width}}  {figure:>{figure_width}}"
+        for label, figure in lines[:-1]
+    ]
+    total_label, total_figure = lines[-1]
+    return [
+        *body,
+        f"    {'':<{label_width}}  {'-' * figure_width}",
+        f"    {total_label:<{label_width}}  {total_figure:>{figure_width}}",
+    ]
+
+
 def _trial_balance(book: Ledger) -> list[str]:
     """Every account grouped by currency, and the proof that each block cancels.
 
@@ -204,27 +249,10 @@ def _trial_balance(book: Ledger) -> list[str]:
     points up without any special handling.
     """
     rows = [f"Trial balance at end of Day {WINDOW}", "-" * 66]
-    by_currency: dict[Currency, list[str]] = {}
-    for account_id, account in book.chart.items():
-        by_currency.setdefault(account.currency, []).append(account_id)
-
-    for currency in sorted(by_currency):
-        shown = [
-            account_id
-            for account_id in by_currency[currency]
-            if book.closing_balance(account_id, WINDOW).minor != 0
-            or account_id in CUSTOMERS
-        ]
-        width = max(len(account_id) for account_id in shown)
-        total = Money(book.trial_balance(WINDOW)[currency], currency)
-        figures = [_amount(book.closing_balance(a, WINDOW)) for a in shown]
-        money = max(len(f) for f in figures + [_amount(total)])
-
+    grouped = _accounts_by_currency(book)
+    for currency in sorted(grouped):
         rows.append(f"  {currency}")
-        for account_id, figure in zip(shown, figures):
-            rows.append(f"    {account_id:<{width}}  {figure:>{money}}")
-        rows.append(f"    {'':<{width}}  {'-' * money}")
-        rows.append(f"    {'sum':<{width}}  {_amount(total):>{money}}")
+        rows += _align(_block(book, currency, grouped[currency]))
     return rows
 
 
