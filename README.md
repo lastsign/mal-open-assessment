@@ -21,7 +21,15 @@ make test      # full suite: 70 pass, 1 xfail (the deliberate one)
 make run       # replay the six days and print the report
 make run-pit   # the same replay under the alternative fee policy
 make gap       # run the failing test unmasked, so it shows red
+make complexity  # cognitive complexity gate (complexipy) + McCabe report (radon)
+make check       # both
 ```
+
+`make complexity` needs the dev extra: `pip install -e '.[dev]'`. It gates
+cognitive complexity at 15 per function and reports cyclomatic complexity
+alongside, because the two metrics disagree in useful ways -- a flat function
+with many branches scores badly on McCabe and fine on cognitive, and deep
+nesting does the reverse.
 
 Without a virtualenv, `PYTHONPATH=. python3 -m pytest` works too — the package
 has no runtime dependencies.
