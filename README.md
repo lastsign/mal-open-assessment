@@ -223,25 +223,18 @@ changed; what changed is what the ledger had been told.
 
 ```mermaid
 flowchart LR
-    B2["Day 2 closes<br/>nothing backdated yet<br/>+250.00"]
-    E7["Day 5<br/>E7 arrives: −620.00<br/>value-dated Day 2"]
-    FEE["fees assessed for<br/>Days 2, 4 and 5<br/>−75.00 in total"]
-    B5["Day 2 now reads<br/>−395.00"]
-    E9["Day 6<br/>E9 arrives: +620.00<br/>reverses E7,<br/>still value-dated Day 2"]
-    B6["Day 2 now reads<br/>+225.00<br/>the fees stay"]
-
-    B2 --> E7
-    E7 --> FEE
-    E7 --> B5
-    FEE --> B5
-    B5 --> E9
-    E9 --> B6
+    A["Day 2 closes<br/>+250.00<br/>nothing backdated yet"]
+    --> B["Day 5<br/>E7 arrives: −620.00<br/>value-dated Day 2"]
+    --> C["same day<br/>Day 2 is re-evaluated<br/>and charged −25.00"]
+    --> D["Day 2 now reads<br/>−395.00"]
+    --> E["Day 6<br/>E9 reverses E7: +620.00<br/>still value-dated Day 2"]
+    --> F["Day 2 now reads<br/>+225.00<br/>the fee stays"]
 ```
 
 This is the whole exercise in one picture. A statement posted after Day 2
 closed said +250.00 and was correct. The customer was later charged for being
 overdrawn on that day, and the charge was also correct. The reversal on Day 6
-returns the money but **not** the fees, which is why criterion 6 is refused:
+returns the money but **not** the fee, which is why criterion 6 is refused:
 an append-only ledger does not return to an earlier state, it only arrives at
 a balance that may again resemble one.
 

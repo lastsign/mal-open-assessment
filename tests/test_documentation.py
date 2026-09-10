@@ -75,5 +75,7 @@ def test_the_readme_diagram_figures_match_the_ledger() -> None:
 
     readme = (ROOT / "README.md").read_text()
     diagram = readme[readme.index("### Why a day has two balances") :]
-    for figure in ("+250.00", "−395.00", "+225.00", "−75.00"):
+    # Only the Day 2 fee bears on Day 2's balance; the other two are dated
+    # into Days 4 and 5 and would be a distraction in this chain.
+    for figure in ("+250.00", "−395.00", "+225.00", "−25.00"):
         assert figure in diagram, f"{figure} has gone from the diagram"
