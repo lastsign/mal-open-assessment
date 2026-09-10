@@ -94,6 +94,9 @@ current day, the fee's value date would always equal its booking date and there
 would be nothing to specify. Requiring a value date only makes sense if a fee
 can be dated into a day other than the one it is booked on.
 
+The README has a picture of this — *Why a day has two balances* — showing the
+same day answering +250.00, −395.00 and +225.00 at three different moments.
+
 **What is uncomfortable about it.** No real bank re-runs a closed fee cycle in
 place; it books an adjustment, and the customer's Day 2 statement still shows
 +250.00 with no visible reason for the charge. `tests/test_known_gap.py`

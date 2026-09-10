@@ -52,3 +52,28 @@ def test_every_citation_points_at_what_it_claims(
         f"{doc.name} cites {symbol!r} at {path}:{line}, "
         f"which reads: {source[line - 1].strip()!r}"
     )
+
+
+def test_the_readme_diagram_figures_match_the_ledger() -> None:
+    """The value-dating diagram states three balances for the same day.
+
+    They are the point of the picture, so they are pinned here rather than
+    left to be re-derived by anyone who edits it.
+    """
+    from ledger.core import FeePolicy
+    from ledger.replay import replay, stream
+
+    full = replay(policy=FeePolicy.RETROACTIVE)
+    # The world as it stood at the end of Day 5: E7 has landed, E9 has not.
+    mid = replay(
+        [e for e in stream() if e.event_id != "E9"], policy=FeePolicy.RETROACTIVE
+    )
+
+    assert str(full.snapshots[2]["ACC-001"]) == "250.00 AED"
+    assert str(mid.closing_balance("ACC-001", 2)) == "-395.00 AED"
+    assert str(full.closing_balance("ACC-001", 2)) == "225.00 AED"
+
+    readme = (ROOT / "README.md").read_text()
+    diagram = readme[readme.index("### Why a day has two balances") :]
+    for figure in ("+250.00", "−395.00", "+225.00", "−75.00"):
+        assert figure in diagram, f"{figure} has gone from the diagram"

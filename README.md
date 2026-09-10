@@ -125,7 +125,7 @@ Python 3.12 or newer.
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[test]'
 
-make test      # full suite: 128 pass, 1 xfail (the deliberate one)
+make test      # full suite: 129 pass, 1 xfail (the deliberate one)
 make run       # replay the six days and print the report
 make run-pit   # the same replay under the alternative fee policy
 make gap       # run the failing test unmasked, so it shows red
@@ -214,6 +214,36 @@ handling. There is deliberately no grand total across currencies.
 `SUSPENSE-AED` holds the force-posted settlement that matched no
 authorisation: an unreconciled position, parked somewhere an operator can see
 and age it.
+
+### Why a day has two balances
+
+The same question — *what is ACC-001's closing balance for Day 2?* — has three
+different correct answers, depending on when it is asked. Nothing about Day 2
+changed; what changed is what the ledger had been told.
+
+```mermaid
+flowchart LR
+    B2["Day 2 closes<br/>nothing backdated yet<br/>+250.00"]
+    E7["Day 5<br/>E7 arrives: −620.00<br/>value-dated Day 2"]
+    FEE["fees assessed for<br/>Days 2, 4 and 5<br/>−75.00 in total"]
+    B5["Day 2 now reads<br/>−395.00"]
+    E9["Day 6<br/>E9 arrives: +620.00<br/>reverses E7,<br/>still value-dated Day 2"]
+    B6["Day 2 now reads<br/>+225.00<br/>the fees stay"]
+
+    B2 --> E7
+    E7 --> FEE
+    E7 --> B5
+    FEE --> B5
+    B5 --> E9
+    E9 --> B6
+```
+
+This is the whole exercise in one picture. A statement posted after Day 2
+closed said +250.00 and was correct. The customer was later charged for being
+overdrawn on that day, and the charge was also correct. The reversal on Day 6
+returns the money but **not** the fees, which is why criterion 6 is refused:
+an append-only ledger does not return to an earlier state, it only arrives at
+a balance that may again resemble one.
 
 ## The failing test
 
