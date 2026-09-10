@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping
 
-from ledger.core import Decision, FeePolicy, Ledger
+from ledger.core import Account, AccountKind, Decision, FeePolicy, Ledger
 from ledger.events import (
     Authorization,
     Credit,
@@ -24,7 +24,30 @@ from ledger.money import AED, BHD, Currency, Money
 
 WINDOW: Day = 6
 
-ACCOUNTS: Mapping[str, Currency] = {"ACC-001": AED, "ACC-002": BHD}
+
+
+def _account(account_id: str, currency: Currency, kind: AccountKind) -> Account:
+    return Account(account_id, currency, kind)
+
+
+# The chart is deliberately the smallest one that lets every event balance.
+# Customer accounts are the only ones that attract fees and interest; the
+# rest exist so that money has somewhere to come from and go to.
+CHART: Mapping[str, Account] = {
+    a.id: a
+    for a in (
+        _account("ACC-001", AED, AccountKind.CUSTOMER),
+        _account("ACC-002", BHD, AccountKind.CUSTOMER),
+        _account("CLEARING-AED", AED, AccountKind.CLEARING),
+        _account("CLEARING-BHD", BHD, AccountKind.CLEARING),
+        _account("SUSPENSE-AED", AED, AccountKind.SUSPENSE),
+        _account("INCOME-FEES-AED", AED, AccountKind.INCOME),
+        _account("EXPENSE-INTEREST-AED", AED, AccountKind.EXPENSE),
+        _account("EXPENSE-INTEREST-BHD", BHD, AccountKind.EXPENSE),
+    )
+}
+
+CUSTOMERS: tuple[str, ...] = ("ACC-001", "ACC-002")
 
 OPENING: Mapping[str, Money] = {
     "ACC-001": Money.parse("0.00", AED),
@@ -51,9 +74,10 @@ def stream() -> list[Event]:
 def replay(
     events: list[Event] | None = None,
     policy: FeePolicy = FeePolicy.RETROACTIVE,
+    chart: Mapping[str, Account] | None = None,
 ) -> Ledger:
     events = stream() if events is None else events
-    book = Ledger(ACCOUNTS, fee_policy=policy)
+    book = Ledger(CHART if chart is None else chart, fee_policy=policy)
     for account, opening in OPENING.items():
         if opening.minor:
             book.post_event(Credit(f"OPEN-{account}", 1, 1, account, opening))
@@ -81,10 +105,10 @@ def _restated_table(book: Ledger) -> list[str]:
     rows = [
         f"Restated at end of Day {WINDOW} (all entries, by value date)",
         "-" * 66,
-        "  day  " + "  ".join(_pad(a, 16) for a in ACCOUNTS),
+        "  day  " + "  ".join(_pad(a, 16) for a in CUSTOMERS),
     ]
     for day in range(1, WINDOW + 1):
-        cells = [_pad(str(book.closing_balance(a, day)), 16) for a in ACCOUNTS]
+        cells = [_pad(str(book.closing_balance(a, day)), 16) for a in CUSTOMERS]
         rows.append(f"  {day:>3}  " + "  ".join(cells))
     return rows
 
@@ -92,7 +116,7 @@ def _restated_table(book: Ledger) -> list[str]:
 def _balances(book: Ledger, day: Day) -> list[str]:
     """Both views of the day: how it closed, and how it reads now."""
     rows: list[str] = []
-    for account in ACCOUNTS:
+    for account in CUSTOMERS:
         closed = book.snapshots[day][account]
         restated = book.closing_balance(account, day)
         rows.append(_line("closed at", f"{account}  {closed}"))
@@ -150,7 +174,8 @@ def _errors(decisions: list[Decision]) -> list[str]:
 
 def _interest(book: Ledger) -> list[str]:
     rows = ["Interest", "-" * 66]
-    for account, currency in ACCOUNTS.items():
+    for account in CUSTOMERS:
+        currency = book.currency_of(account)
         accruals = book.daily_accruals(account)
         if not any(accruals):
             rows.append(f"  {account}  no positive closing balance in the window")
@@ -161,6 +186,19 @@ def _interest(book: Ledger) -> list[str]:
             f"  {account}  capitalised on Day {WINDOW}: "
             f"{Money(sum(accruals), currency)}"
         )
+    return rows
+
+
+def _trial_balance(book: Ledger) -> list[str]:
+    """Every account in the chart, and the proof that they cancel."""
+    rows = ["Trial balance at end of Day 6", "-" * 66]
+    for account in book.chart:
+        balance = book.closing_balance(account, WINDOW)
+        if balance.minor == 0 and account not in CUSTOMERS:
+            continue
+        rows.append(f"  {account:<22}{_pad(str(balance), 16)}")
+    for currency, total in sorted(book.trial_balance(WINDOW).items()):
+        rows.append(f"  {'sum of all ' + currency + ' accounts':<22}{_pad(str(Money(total, currency)), 16)}")
     return rows
 
 
@@ -184,6 +222,8 @@ def render(book: Ledger, policy: FeePolicy) -> str:
         out += _errors(by_day.get(day, []))
         out.append("")
     out += _interest(book)
+    out.append("")
+    out += _trial_balance(book)
     out.append("")
     return "\n".join(out)
 

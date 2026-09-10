@@ -4,7 +4,7 @@ import pytest
 
 from ledger.core import FeePolicy
 from ledger.money import AED, BHD, Money
-from ledger.replay import replay
+from ledger.replay import CUSTOMERS, replay
 
 
 @pytest.fixture(scope="module")
@@ -18,8 +18,15 @@ def pit():
 
 
 def _fees(book) -> list[tuple[int, int]]:
-    """(value_date, booked_day) of every overdraft fee, in book order."""
-    return [(e.value_date, e.booked_day) for e in book.entries if e.kind == "FEE"]
+    """(value_date, booked_day) of every overdraft fee, customer side only.
+
+    Each fee is two postings now; the customer leg is the one being counted.
+    """
+    return [
+        (e.value_date, e.booked_day)
+        for e in book.entries
+        if e.kind == "FEE" and e.account in CUSTOMERS
+    ]
 
 
 def _closings(book, account) -> list[str]:
@@ -96,14 +103,20 @@ def test_the_fee_itself_feeds_the_next_days_balance(retro) -> None:
 
 def test_daily_accruals_sum_exactly_to_the_capitalised_credit(retro) -> None:
     accruals = retro.daily_accruals("ACC-001")
-    credit = next(e for e in retro.entries if e.kind == "INTEREST" and e.account == "ACC-001")
+    credit = next(
+        e for e in retro.entries
+        if e.kind == "INTEREST" and e.account == "ACC-001"
+    )
     assert sum(accruals) == credit.amount.minor
     assert str(credit.amount) == "0.70 AED"
     assert accruals == [10, 9, 25, 10, 8, 8]
 
 
 def test_bhd_interest_needs_no_apportionment(retro) -> None:
-    credit = next(e for e in retro.entries if e.kind == "INTEREST" and e.account == "ACC-002")
+    credit = next(
+        e for e in retro.entries
+        if e.kind == "INTEREST" and e.account == "ACC-002"
+    )
     assert str(credit.amount) == "0.008 BHD"
     assert retro.daily_accruals("ACC-002") == [0, 0, 0, 0, 4, 4]
 
@@ -114,8 +127,11 @@ def test_interest_ignores_days_that_closed_at_or_below_zero(retro) -> None:
 
 
 def test_interest_is_credited_once_on_day_six(retro) -> None:
-    credits = [e for e in retro.entries if e.kind == "INTEREST"]
-    assert len(credits) == 2  # one per account
+    credits = [
+        e for e in retro.entries
+        if e.kind == "INTEREST" and e.account in CUSTOMERS
+    ]
+    assert len(credits) == 2  # one per customer account
     assert {e.value_date for e in credits} == {6}
 
 
@@ -129,8 +145,8 @@ def test_sequence_numbers_are_dense_and_ordered(retro) -> None:
 
 
 def test_the_reversal_adds_a_record_rather_than_removing_one(retro) -> None:
-    e7 = [e for e in retro.entries if e.event_id == "E7"]
-    e9 = [e for e in retro.entries if e.event_id == "E9"]
+    e7 = [e for e in retro.entries if e.event_id == "E7" and e.account == "ACC-001"]
+    e9 = [e for e in retro.entries if e.event_id == "E9" and e.account == "ACC-001"]
     assert len(e7) == 1 and len(e9) == 1
     assert e7[0].amount == -e9[0].amount
     assert e9[0].value_date == e7[0].value_date == 2
