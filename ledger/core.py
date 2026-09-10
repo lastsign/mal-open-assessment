@@ -31,6 +31,7 @@ from ledger.events import (
 from ledger.money import (
     AED,
     Currency,
+    CurrencyMismatch,
     Money,
     allocate,
     apportion,
@@ -138,6 +139,9 @@ class Ledger:
         fee_policy: FeePolicy = FeePolicy.RETROACTIVE,
     ) -> None:
         self._chart = dict(chart)
+        self._customers = [
+            a.id for a in chart.values() if a.kind is AccountKind.CUSTOMER
+        ]
         self._fee_policy = fee_policy
         self._entries: list[Entry] = []
         self._decisions: list[Decision] = []
@@ -153,7 +157,7 @@ class Ledger:
 
     @property
     def customers(self) -> list[str]:
-        return [a.id for a in self._chart.values() if a.kind is AccountKind.CUSTOMER]
+        return list(self._customers)
 
     @property
     def chart(self) -> Mapping[str, Account]:
@@ -202,6 +206,19 @@ class Ledger:
         """
         totals: dict[Currency, int] = defaultdict(int)
         for posting in postings:
+            # Zero-sum is not enough. An AED posting into a BHD account nets
+            # to zero against its own contra and then poisons every later
+            # balance query on a log that cannot delete it.
+            account = self._chart.get(posting.account)
+            if account is None:
+                raise NoSuchAccount(
+                    f"{event_id}: {posting.account!r} is not in the chart"
+                )
+            if posting.amount.currency != account.currency:
+                raise CurrencyMismatch(
+                    f"{event_id}: {posting.amount.currency} posting into "
+                    f"{posting.account}, which is {account.currency}"
+                )
             totals[posting.amount.currency] += posting.amount.minor
         unbalanced = {c: v for c, v in totals.items() if v != 0}
         if unbalanced:
@@ -250,7 +267,7 @@ class Ledger:
     def fees_on(self, day: Day) -> list[Entry]:
         return [
             e for e in self._entries
-            if e.kind == "FEE" and e.value_date == day and e.account in self.customers
+            if e.kind == "FEE" and e.value_date == day and e.account in self._customers
         ]
 
     # ------------------------------------------------------------- views
@@ -432,15 +449,29 @@ class Ledger:
                 for o in originals
             ],
         )
-        self._decide(event.event_id, event.booked_day, "REVERSED", f"contra of {event.reverses}")
+        reason = f"contra of {event.reverses}"
+        settled = {o.note.removeprefix("settles ") for o in originals
+                   if o.kind == "SETTLEMENT" and o.note.startswith("settles ")}
+        if settled:
+            # Deliberate, and stated rather than left to be inferred: an
+            # authorisation is consumed by settling, and returning the money
+            # does not un-consume it. A re-presentment needs a fresh
+            # authorisation, which is what the scheme would require too.
+            reason += (
+                f"; {', '.join(sorted(settled))} stays SETTLED and is not reopened"
+            )
+        self._decide(event.event_id, event.booked_day, "REVERSED", reason)
 
     # ------------------------------------------------------------- close
 
     def close_day(self, day: Day) -> list[Entry]:
         """Assess overdraft fees for this close. Returns the fees booked."""
-        days: Iterable[Day] = (
-            range(1, day + 1) if self._fee_policy is FeePolicy.RETROACTIVE else (day,)
+        days: tuple[Day, ...] = (
+            tuple(range(1, day + 1))
+            if self._fee_policy is FeePolicy.RETROACTIVE
+            else (day,)
         )
+        self._refuse_unchargeable_fees(days)
         booked: list[Entry] = []
         for account in self.customers:
             # Ascending: a fee dated day D is itself an entry that drags
@@ -453,6 +484,27 @@ class Ledger:
             account: self.closing_balance(account, day) for account in self.customers
         }
         return booked
+
+    def _refuse_unchargeable_fees(self, days: Iterable[Day]) -> None:
+        """Fail before the first fee is committed, not partway through.
+
+        An account in a currency the fee schedule does not name can never be
+        charged, so its balance is unaffected by the cascade and this check is
+        exact. Running it first is what keeps a close atomic: the alternative
+        raises after earlier customers have already been charged, leaving a
+        half-assessed day in a log that cannot take it back.
+        """
+        for account in self.customers:
+            if self.currency_of(account) == OVERDRAFT_FEE.currency:
+                continue
+            for day in days:
+                if self.closing_balance(account, day).is_negative:
+                    raise UndefinedFeeCurrency(
+                        f"{account} closes negative on day {day} and is "
+                        f"{self.currency_of(account)}, but the fee schedule is "
+                        f"written in {OVERDRAFT_FEE.currency}; no rate was "
+                        f"given. See AMBIGUITIES.md."
+                    )
 
     def _maybe_assess_fee(
         self, account: str, value_date: Day, booked_day: Day
