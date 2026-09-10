@@ -3,26 +3,56 @@
 ## Verdict
 
 **Five of the eight stated criteria are wrong.** Each refusal is backed by a
-test in `tests/test_criteria.py` that asserts the criterion **false** rather
-than encoding it.
+test in `tests/test_criteria.py` that asserts the criterion false rather than
+encoding it.
 
-| | criterion, in short | verdict |
-|---|---|---|
-| 1 | Day 2 restates to −370.00 | ✅ correct — nothing to argue |
-| [2](#c2) | E7 causes exactly one fee, on Day 2 | ❌ **refused** — three fees, or one on Day 5 |
-| 3 | The Day 4 settlement of Auth-A is accepted | ✅ correct — nothing to argue |
-| [4](#c4) | An unmatched settlement must be rejected | ❌ **refused** — it is a force post |
-| [5](#c5) | A hold moves available, not ledger, balance | ⚠️ true, but Auth-B is never approved |
-| [6](#c6) | After E9 everything returns to pre-E7 values | ❌ **refused** — the fees stand |
-| [7](#c7) | Three instalments of BHD 3.334 | ❌ **refused** — that is 10.002 |
-| [8](#c8) | Discard the interest rounding remainder | ❌ **refused** — contradicts the brief's own rule |
+### Refused — 2, 4, 6, 7, 8
 
-Criteria 1 and 3 are correct and get no section here; they are tested in
+**[Criterion 2](#c2) — "E7 causes exactly one overdraft fee, on Day 2"**
+
+Three fees, value-dated Days 2, 4 and 5. Worth reading first: it is false
+under *either* resolution of the backdating question, so refusing it costs no
+bet on my own interpretation. Under the other reading there is one fee, but on
+Day 5.
+
+**[Criterion 4](#c4) — "An unmatched settlement must be rejected and the funds
+must not leave the account"**
+
+It is a force post, and a routine one. The scheme has already paid the
+merchant; declining does not keep the money, it only puts the ledger out of
+step with the clearing file.
+
+**[Criterion 6](#c6) — "After E9, all balances and fees return to their pre-E7
+values"**
+
+The fees stand — a reversal is a new contra entry, not a deletion, and fee
+refund is a policy nobody specified. So the balance does not return either:
+Day 2 reads 225.00, not 250.00.
+
+**[Criterion 7](#c7) — "The three BHD instalments must each be BHD 3.334"**
+
+That is 10.002. The correct split is 3.334 / 3.333 / 3.333.
+
+**[Criterion 8](#c8) — "The interest rounding remainder is discarded"**
+
+Contradicts the brief's own non-negotiable rule, and the remainder is real on
+this data: independently rounded days sum to 0.69 against a true 0.70.
+
+### True, but its premise never occurs — 5
+
+**[Criterion 5](#c5) — "If Auth-B is approved, its hold reduces available
+balance but not ledger balance"**
+
+The property is real and implemented. But Auth-B is **declined** — available
+balance is −335.00 by the time E8 is processed — so the criterion describes a
+branch this stream never reaches. Flagged rather than refused: a conditional
+with a false antecedent is not a false statement.
+
+### Correct — 1, 3
+
+Criterion 1 (Day 2 restates to −370.00) and criterion 3 (the Day 4 settlement
+of Auth-A is accepted) are right and get no section below. They are tested in
 `tests/test_criteria.py` like the rest.
-
-Criterion 2 is the one worth reading first: it is false under *either*
-resolution of the backdating ambiguity, so refusing it costs no bet on my own
-interpretation.
 
 ---
 

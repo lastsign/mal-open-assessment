@@ -13,6 +13,8 @@ quietly mixed in, and nothing in it is load-bearing for a conclusion.
 
 ---
 
+<a id="consulted"></a>
+
 ## Consulted
 
 **Islamic finance regulation, UAE onshore**
@@ -76,6 +78,8 @@ quietly mixed in, and nothing in it is load-bearing for a conclusion.
   is made in a room with a Shari'ah scholar in it.**
 
 ---
+
+<a id="asserted"></a>
 
 ## Asserted from prior knowledge, not verified here
 

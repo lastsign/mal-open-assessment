@@ -4,22 +4,48 @@ An append-only, value-dated, double-entry ledger for two accounts over a
 six-day window. No web layer, no persistence, no database, and no dependencies
 beyond `pytest`.
 
-## Where to start
+## What's here
 
-| if you have | read |
-|---|---|
-| **two minutes** | the results below |
-| **fifteen** | [REJECTED.md](REJECTED.md), then `make run` |
-| **an hour** | REJECTED → [AMBIGUITIES.md](AMBIGUITIES.md) → [NUMBERS.md](NUMBERS.md) → `doc/architecture.pdf` |
+Read top to bottom for the argument; the sub-entries are the parts worth
+jumping to.
 
-| document | answers |
-|---|---|
-| [REJECTED.md](REJECTED.md) | which acceptance criteria are wrong, and what was abandoned mid-build |
-| [AMBIGUITIES.md](AMBIGUITIES.md) | 24 questions the brief left open, indexed, with what each costs |
-| [NUMBERS.md](NUMBERS.md) | every constant, with its sensitivity measured rather than asserted |
-| [SOURCES.md](SOURCES.md) | what the jurisdiction claims rest on, and where checked material ends |
-| [WORKLOG.md](WORKLOG.md) | what happened, in order, including the parts that went wrong |
-| `doc/architecture.pdf` | Part 2 — scale, regulation, authorisation lifecycle, cuts |
+- **[REJECTED.md](REJECTED.md)** — which acceptance criteria are wrong, and
+  what was abandoned mid-build. *Start here.*
+  - [The verdict](REJECTED.md#verdict) — five refused, one true but unreachable
+  - [Criterion 2](REJECTED.md#c2) — three fees, not one, and false under
+    *either* resolution of the backdating question
+  - [Criterion 4](REJECTED.md#c4) — an unmatched settlement is a force post,
+    not something a ledger can decline
+  - [Criterion 8](REJECTED.md#c8) — the discarded remainder is real here: 0.69
+    against a true 0.70
+  - [Approaches abandoned mid-build](REJECTED.md#approaches-abandoned-mid-build)
+    — single-entry postings, and appending legs one at a time
+- **[AMBIGUITIES.md](AMBIGUITIES.md)** — 24 questions the brief left open,
+  indexed, each with what it costs if resolved the other way
+  - [A1](AMBIGUITIES.md#a1) — does a closed day reopen when a backdated entry
+    lands? The fork that moves every figure; both answers are implemented
+  - [A5](AMBIGUITIES.md#a5) and [A7](AMBIGUITIES.md#a7) — what "the capitalized
+    total" is, and which day gets the spare fils
+  - [A9](AMBIGUITIES.md#a9) — why the fee is refused rather than converted
+  - [A20](AMBIGUITIES.md#a20) — which licence this runs under; two of the
+    brief's own rules would not survive an Islamic one
+  - [A22](AMBIGUITIES.md#a22) — where the other side of each posting goes
+- **[NUMBERS.md](NUMBERS.md)** — every constant, with its sensitivity measured
+  rather than asserted
+  - [The overdraft fee](NUMBERS.md#fee)
+    is a threshold, not a slope: at 30.01 a fourth fee appears, and halving it
+    changes nothing
+  - [Rounding](NUMBERS.md#rounding)
+    happens once, at one call site
+  - [Constants deliberately absent](NUMBERS.md#absent)
+- **[SOURCES.md](SOURCES.md)** — what the jurisdiction-specific claims rest on
+  - [Consulted](SOURCES.md#consulted) versus
+    [asserted from prior knowledge](SOURCES.md#asserted)
+- **[WORKLOG.md](WORKLOG.md)** — what happened, in order, including the parts
+  that went wrong
+- **`doc/architecture.pdf`** — Part 2. Scale, the regulatory surface of value
+  dating, the authorisation lifecycle, and what was cut.
+  `doc/architecture.tex` is the source.
 
 ## Results
 

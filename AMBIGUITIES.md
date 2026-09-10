@@ -3,41 +3,69 @@
 Every question the brief did not settle, how this ledger answers it, and what
 would change if the answer is wrong.
 
-**Money column:** ● moves a number in the report, ○ does not on this data.
-Start with the four marked ●.
+## Index
 
-| | question | resolved as | |
-|---|---|---|---|
-| [A1](#a1) | Does a closed day reopen when a backdated entry lands? | retroactive by default, both implemented | ● |
-| [A2](#a2) | Does a fee feed the balance that triggers the next fee? | yes, it is an entry like any other | ○ |
-| [A3](#a3) | Stream order or booking day? E10 is listed after E9 but booked earlier | booking day, listed order within a day | ○ |
-| [A4](#a4) | Does interest accrue on final or as-known-at-close balances? | final, under both policies | ● |
-| [A5](#a5) | What exactly is "the capitalized total"? | the exact sum rounded once, dailies fitted to it | ● |
-| [A6](#a6) | Rounding mode? | half away from zero, applied once | ○ |
-| [A7](#a7) | Tie-break in the apportionment? | largest remainder, earliest day wins | ● |
-| [A8](#a8) | Is zero positive, negative, or neither? | neither: no interest, no fee | ○ |
-| [A9](#a9) | Which currency is the fee charged in on a BHD account? | refuses rather than converts | ○ |
-| [A10](#a10) | When is a partial settlement's residual released? | immediately, on the settlement's value date | ○ |
-| [A11](#a11) | What if a settlement exceeds its authorisation? | booked in full, not capped | ○ |
-| [A12](#a12) | What happens to Auth-B at the end of the window? | moot: it is declined. No expiry modelled | ○ |
-| [A13](#a13) | Which day's balance tests an authorisation? | its own value date | ○ |
-| [A14](#a14) | Does reversing an entry reverse the fee it caused? | no; fee reversal is a policy nobody gave | ● |
-| [A15](#a15) | May an entry be reversed twice, or a missing one reversed? | both rejected, both recorded | ○ |
-| [A16](#a16) | Are the opening balances events? | a zero opening posts nothing | ○ |
-| [A17](#a17) | "Once per day per account" — which day? | the value date | ○ |
-| [A18](#a18) | Does the capitalised credit accrue interest on Day 6? | no; that would be self-referential | ○ |
-| [A19](#a19) | Are the three instalments one entry or three? | three, under one transaction | ○ |
-| [A20](#a20) | Which licence is this running under? | conventional, as specified — but see the entry | ○ |
-| [A21](#a21) | What is a "day"? | an opaque ordinal; no calendar at all | ○ |
-| [A22](#a22) | Where does the other side of a credit or debit go? | a minimal chart; force posts to suspense | ○ |
-| [A23](#a23) | Is a hold a posting? | no. The only event type that posts nothing | ○ |
-| [A24](#a24) | Does reversing a settlement reopen the authorisation? | no; a re-presentment needs a fresh one | ○ |
+**Five of these move a figure in the report. Start with them.**
 
-A20 and A21 answer questions the brief never asked. They are here because the
-brief places this in a UAE-licensed bank, and two of its own rules would not
-survive an Islamic licence.
+- [A1](#a1) — Does a closed day reopen when a backdated entry lands?
+  → retroactive by default; both policies implemented and tested
+- [A4](#a4) — Does interest accrue on final or as-known-at-close balances?
+  → final, under both policies
+- [A5](#a5) — What exactly is "the capitalized total"?
+  → the exact sum rounded once, with the daily figures fitted to it
+- [A7](#a7) — Which day gets the spare fils?
+  → largest remainder, earliest day wins
+- [A14](#a14) — Does reversing an entry reverse the fee it caused?
+  → no; fee refund is a policy nobody specified
+
+**The rest change no figure on this data, but each names a decision that was
+made rather than defaulted into.**
+
+- [A2](#a2) — Does a fee feed the balance that triggers the next fee?
+  → yes; it is an entry like any other
+- [A3](#a3) — Stream order or booking day? E10 is listed after E9 but booked earlier
+  → booking day, preserving listed order within a day
+- [A6](#a6) — Rounding mode?
+  → half away from zero, applied once, at one call site
+- [A8](#a8) — Is zero positive, negative, or neither?
+  → neither: no interest and no fee
+- [A9](#a9) — Which currency is the fee charged in on a BHD account?
+  → it refuses rather than converts
+- [A10](#a10) — When is a partial settlement's residual released?
+  → immediately, on the settlement's value date
+- [A11](#a11) — What if a settlement exceeds its authorisation?
+  → booked in full, not capped at the hold
+- [A12](#a12) — What happens to Auth-B at the end of the window?
+  → moot, since it is declined; no expiry is modelled
+- [A13](#a13) — Which day's balance tests an authorisation?
+  → its own value date
+- [A15](#a15) — May an entry be reversed twice, or a missing one reversed?
+  → both rejected, both recorded
+- [A16](#a16) — Are the opening balances events?
+  → a zero opening posts nothing
+- [A17](#a17) — "Once per day per account" — which day?
+  → the value date
+- [A18](#a18) — Does the capitalised credit accrue interest on Day 6?
+  → no; that would be self-referential
+- [A19](#a19) — Are the three instalments one entry or three?
+  → three, under a single transaction
+- [A20](#a20) — Which licence is this running under?
+  → conventional, as specified — but two of the brief's own rules would not
+  survive an Islamic one
+- [A21](#a21) — What is a "day"?
+  → an opaque ordinal; the ledger knows no calendar at all
+- [A22](#a22) — Where does the other side of a credit or debit go?
+  → a minimal chart, with force posts parked in suspense
+- [A23](#a23) — Is a hold a posting?
+  → no; the only event type that posts nothing
+- [A24](#a24) — Does reversing a settlement reopen the authorisation?
+  → no; a re-presentment needs a fresh one
+
+A20 and A21 answer questions the brief never asked. They are here because it
+places this ledger in a UAE-licensed bank, and that is not one rulebook.
 
 ---
+
 <a id="a1"></a>
 
 ## A1. Does a day that has already closed reopen when a backdated entry lands?

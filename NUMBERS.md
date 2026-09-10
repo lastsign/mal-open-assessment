@@ -6,6 +6,8 @@ as choices.
 
 ---
 
+<a id="fee"></a>
+
 ## Overdraft fee — AED 25.00 (`OVERDRAFT_FEE`, 2500 minor)
 
 **Given.** Not chosen, but it is load-bearing, and closer to a cliff edge than
@@ -32,6 +34,8 @@ policy question the brief does not answer (AMBIGUITIES A2); this ledger
 implements compounding because a fee is an entry, and entries count.
 
 ---
+
+<a id="rate"></a>
 
 ## Daily interest rate — 0.04% per day (`DAILY_INTEREST_RATE`, `Fraction(4, 10_000)`)
 
@@ -91,6 +95,8 @@ three.
 
 ---
 
+<a id="rounding"></a>
+
 ## Rounding: half away from zero, applied once (`round_half_up`)
 
 **Chosen.** Half-even is the better default when many values are rounded
@@ -141,6 +147,8 @@ nothing — and those fees could not even be denominated, since the fee schedule
 is written in AED and the account is BHD (AMBIGUITIES A9).
 
 ---
+
+<a id="absent"></a>
 
 ## Constants deliberately absent
 
