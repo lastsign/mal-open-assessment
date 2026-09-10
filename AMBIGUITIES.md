@@ -1,9 +1,44 @@
 # Ambiguities
 
 Every question the brief did not settle, how this ledger answers it, and what
-would change if the answer is wrong. Ordered by how much money moves.
+would change if the answer is wrong.
+
+**Money column:** ● moves a number in the report, ○ does not on this data.
+Start with the four marked ●.
+
+| | question | resolved as | |
+|---|---|---|---|
+| [A1](#a1) | Does a closed day reopen when a backdated entry lands? | retroactive by default, both implemented | ● |
+| [A2](#a2) | Does a fee feed the balance that triggers the next fee? | yes, it is an entry like any other | ○ |
+| [A3](#a3) | Stream order or booking day? E10 is listed after E9 but booked earlier | booking day, listed order within a day | ○ |
+| [A4](#a4) | Does interest accrue on final or as-known-at-close balances? | final, under both policies | ● |
+| [A5](#a5) | What exactly is "the capitalized total"? | the exact sum rounded once, dailies fitted to it | ● |
+| [A6](#a6) | Rounding mode? | half away from zero, applied once | ○ |
+| [A7](#a7) | Tie-break in the apportionment? | largest remainder, earliest day wins | ● |
+| [A8](#a8) | Is zero positive, negative, or neither? | neither: no interest, no fee | ○ |
+| [A9](#a9) | Which currency is the fee charged in on a BHD account? | refuses rather than converts | ○ |
+| [A10](#a10) | When is a partial settlement's residual released? | immediately, on the settlement's value date | ○ |
+| [A11](#a11) | What if a settlement exceeds its authorisation? | booked in full, not capped | ○ |
+| [A12](#a12) | What happens to Auth-B at the end of the window? | moot: it is declined. No expiry modelled | ○ |
+| [A13](#a13) | Which day's balance tests an authorisation? | its own value date | ○ |
+| [A14](#a14) | Does reversing an entry reverse the fee it caused? | no; fee reversal is a policy nobody gave | ● |
+| [A15](#a15) | May an entry be reversed twice, or a missing one reversed? | both rejected, both recorded | ○ |
+| [A16](#a16) | Are the opening balances events? | a zero opening posts nothing | ○ |
+| [A17](#a17) | "Once per day per account" — which day? | the value date | ○ |
+| [A18](#a18) | Does the capitalised credit accrue interest on Day 6? | no; that would be self-referential | ○ |
+| [A19](#a19) | Are the three instalments one entry or three? | three, under one transaction | ○ |
+| [A20](#a20) | Which licence is this running under? | conventional, as specified — but see the entry | ○ |
+| [A21](#a21) | What is a "day"? | an opaque ordinal; no calendar at all | ○ |
+| [A22](#a22) | Where does the other side of a credit or debit go? | a minimal chart; force posts to suspense | ○ |
+| [A23](#a23) | Is a hold a posting? | no. The only event type that posts nothing | ○ |
+| [A24](#a24) | Does reversing a settlement reopen the authorisation? | no; a re-presentment needs a fresh one | ○ |
+
+A20 and A21 answer questions the brief never asked. They are here because the
+brief places this in a UAE-licensed bank, and two of its own rules would not
+survive an Islamic licence.
 
 ---
+<a id="a1"></a>
 
 ## A1. Does a day that has already closed reopen when a backdated entry lands?
 
@@ -41,6 +76,8 @@ Every criterion refusal in REJECTED.md survives the switch.
 
 ---
 
+<a id="a2"></a>
+
 ## A2. Is the overdraft fee itself part of the balance that triggers the next fee?
 
 **The gap.** The fee is booked with a value date, so it is an entry like any
@@ -59,6 +96,8 @@ non-compounding, which is a kinder policy than most and not one I can assume.
 
 ---
 
+<a id="a3"></a>
+
 ## A3. Stream order versus booking day: E10 is listed after E9 but booked earlier
 
 **The gap.** The brief says "replayed in this order" and then lists E10 (booked
@@ -76,6 +115,8 @@ accounts never interact. It would matter immediately if they did, and I would
 rather have the rule stated than be right by luck.
 
 ---
+
+<a id="a4"></a>
 
 ## A4. Which balances does interest accrue on — final, or as-known-at-close?
 
@@ -96,6 +137,8 @@ snapshots under the default policy would give 0.10 + 0.10 + 0.26 + 0.11 + 0 + �
 — a different total and a different apportionment.
 
 ---
+
+<a id="a5"></a>
 
 ## A5. What exactly is "the capitalized total"?
 
@@ -120,6 +163,8 @@ are a decomposition of the credit, not six independent roundings.
 
 ---
 
+<a id="a6"></a>
+
 ## A6. Rounding mode
 
 **The gap.** Not specified anywhere.
@@ -137,6 +182,8 @@ integer division with remainder placement. Nothing else rounds.
 
 ---
 
+<a id="a7"></a>
+
 ## A7. Tie-breaking in the apportionment
 
 **The gap.** ACC-001's Day 4, Day 5 and Day 6 accruals all have a remainder of
@@ -152,6 +199,8 @@ sort stability elsewhere in the program.
 
 ---
 
+<a id="a8"></a>
+
 ## A8. Is a zero balance positive, or negative, or neither?
 
 **The gap.** Interest is on *"positive balances only"*; the fee is on a balance
@@ -165,6 +214,8 @@ overdraft fees on an account that has done nothing — and see A10 for why those
 fees could not even be denominated.
 
 ---
+
+<a id="a9"></a>
 
 ## A9. In what currency is the overdraft fee charged on a BHD account?
 
@@ -180,11 +231,13 @@ is administratively determined rather than market-discovered, and I could
 compute one. "There is no rate" would be the weak version of this argument and
 I would not want to make it under questioning.
 
-The real objection is that converting answers three questions nobody asked. As
-of which date does a value-dated fee convert — its value date, its booking
+The real objection is that converting answers three questions nobody asked.
+
+As of which date does a value-dated fee convert — its value date, its booking
 date, or the day it is charged? Who carries the revaluation when those differ?
-And is a fee schedule even an FX problem? A charge stated as a round number in
-one currency is a *product* decision; converting it produces BHD 2.560 or
+And is a fee schedule even an FX problem?
+
+A charge stated as a round number in one currency is a *product* decision; converting it produces BHD 2.560 or
 similar, which is not a price anyone published, has not been disclosed to the
 customer in the manner the CBUAE Consumer Protection Standards require, and
 silently inherits the durability of a currency peg as a dependency of the fee
@@ -197,6 +250,8 @@ universal constant that happens to be denominated. Conversion is the wrong
 tool for this even when it is available.
 
 ---
+
+<a id="a10"></a>
 
 ## A10. When is the residual of a partial settlement released?
 
@@ -217,6 +272,8 @@ and be rejected. Flagged in the architecture document as a deliberate cut.
 
 ---
 
+<a id="a11"></a>
+
 ## A11. What if a settlement exceeds its authorisation?
 
 **The gap.** Not in the stream, but reachable in the model.
@@ -232,6 +289,8 @@ goes to exception rather than to the account.
 
 ---
 
+<a id="a12"></a>
+
 ## A12. Auth-B is never settled. What happens to it at the end of the window?
 
 **The gap.** The brief states the fact and asks nothing.
@@ -246,6 +305,8 @@ data the brief does not supply. Rather than invent one, expiry is named as a
 cut and enumerated as an authorisation end-state in the architecture document.
 
 ---
+
+<a id="a13"></a>
 
 ## A13. Against which day's balance is an authorisation tested?
 
@@ -263,6 +324,8 @@ value-date consistency is the rule the rest of the ledger already follows.
 −425.00. This is what makes criterion 5 counterfactual.
 
 ---
+
+<a id="a14"></a>
 
 ## A14. Does reversing an entry reverse the fee it caused?
 
@@ -284,6 +347,8 @@ an explicit, attributable decision rather than a side effect of recomputation.
 
 ---
 
+<a id="a15"></a>
+
 ## A15. May the same entry be reversed twice? May a non-existent one be reversed?
 
 **The gap.** Not addressed.
@@ -298,6 +363,8 @@ visible, not absorbed.
 
 ---
 
+<a id="a16"></a>
+
 ## A16. Are the opening balances events?
 
 **The gap.** Both accounts open at zero. The brief lists them as state, not as
@@ -309,6 +376,8 @@ opening credit if one is non-zero, so the ledger has no privileged
 
 ---
 
+<a id="a17"></a>
+
 ## A17. "Once per day per account" — which day?
 
 **The gap.** The day it is *assessed* on, or the day it is *dated* into?
@@ -319,6 +388,8 @@ books three fees at once — for Days 2, 4 and 5 — which is one per day per
 account, not three for one day.
 
 ---
+
+<a id="a18"></a>
 
 ## A18. Does the capitalised interest credit accrue interest on Day 6?
 
@@ -334,6 +405,8 @@ credit. Interest is earned on the balance the customer held, not on the payment
 of that interest.
 
 ---
+
+<a id="a19"></a>
 
 ## A19. Are the three instalments in E10 three entries or one?
 
@@ -353,6 +426,8 @@ different days, every ACC-002 balance and both of its accruals change.
 
 
 ---
+
+<a id="a20"></a>
 
 ## A20. Which licence is this ledger running under?
 
@@ -375,14 +450,17 @@ current account is structured as *Qard* — an interest-free loan from the
 customer to the bank, principal guaranteed, return zero. Where a return is
 paid the account must be *Mudarabah*: a share of the pool's realised profit,
 declared after the period against a pre-agreed sharing ratio, with the
-depositor carrying capital risk. That is a different data model, not a
-different constant — it needs the pool as a dimension, average or minimum
+depositor carrying capital risk. That is a different data model, not a different constant.
+
+It needs the pool as a dimension, average or minimum
 balance over the period, tenor weightings, and smoothing reserves. A rate
 applied daily to a balance cannot express it.
 
 *The overdraft fee* is a charge proportional to the duration of a debt, which
 is what its flatness disguises: assessed once per day for as long as the
-balance stays negative, the total is a function of how long the money was owed.
+balance stays negative, the total is a function of how long the money was
+owed.
+
 AAOIFI Shari'ah Standard 19 permits recovering only the direct actual cost of
 servicing a *qard*, tied to neither amount nor duration. A late-payment charge
 is possible under Standards 3 and 8, but as an undertaking to donate: it is
@@ -393,15 +471,16 @@ and a purification account to hold it. That is an architectural requirement,
 not an accounting note.
 
 **What survives unchanged, and one thing that improves.** The append-only log,
-value dating, and exact remainder distribution all hold. The
-available-balance rule holds too, and is arguably more at home here: an account
-that simply cannot go negative is the Shari'ah-compliant outcome. My decision
-to force-post E6 (REJECTED.md) also survives — driving the account negative
-creates an interest-free debt, which is permissible; what is not permissible is
-charging for the time it stays outstanding. And criterion 8 gets a second,
-independent refutation: an unallocated remainder in a Mudarabah pool belongs to
-the pool, so discarding it produces an unattributed balance that a Shari'ah
-audit would raise.
+value dating, and exact remainder distribution all hold. The available-balance
+rule holds too, and is arguably more at home here: an account that simply
+cannot go negative is the Shari'ah-compliant outcome.
+
+My decision to force-post E6 (REJECTED.md) also survives — driving the account
+negative creates an interest-free debt, which is permissible; what is not
+permissible is charging for the time it stays outstanding. And criterion 8
+gets a second, independent refutation: an unallocated remainder in a Mudarabah
+pool belongs to the pool, so discarding it produces an unattributed balance
+that a Shari'ah audit would raise.
 
 **Which regulator, and why it is not one question.** Onshore, the Higher
 Shari'ah Authority's rulings bind every licensed Islamic institution, and the
@@ -415,6 +494,8 @@ Sources for the above are listed in SOURCES.md.
 
 ---
 
+<a id="a21"></a>
+
 ## A21. What is a "day"?
 
 **The gap.** The window is Day 1 to Day 6 with no calendar behind it. That
@@ -427,12 +508,15 @@ weekends, holidays or calendar systems.
 and the UAE business week is not the one most systems default to. Profit
 distribution periods are Gregorian while a zakat *hawl* is a lunar year on the
 Hijri calendar, so an institution serving those customers needs the balance as
-at an arbitrary past Hijri date. That last requirement is one this design
-happens to meet well — a value-dated append-only log answers "what was the
-balance on any past date" natively, where a mutable balance column cannot
-answer it at all.
+at an arbitrary past Hijri date.
+
+That last requirement is one this design happens to meet well — a value-dated
+append-only log answers "what was the balance on any past date" natively,
+where a mutable balance column cannot answer it at all.
 
 ---
+
+<a id="a22"></a>
 
 ## A22. Where does the other side of a plain credit or debit go?
 
@@ -449,19 +533,22 @@ account raises `NoSuchAccount` rather than being improvised around.
 
 **The one choice inside that worth defending.** The force post's other side
 goes to **suspense, not clearing.** Both are defensible: the scheme has been
-paid, so an argument exists for treating it as ordinary clearing. Suspense
-wins because the position is genuinely unreconciled — we have taken 180.00
-from a customer against an authorisation we have no record of — and parking it
-somewhere named makes it a balance an operator can see and age. Folded into
-clearing it disappears into a large, busy account. This is also what REJECTED
-.md said should happen to a force post, so the chart now implements the
-argument rather than merely asserting it.
+paid, so an argument exists for treating it as ordinary clearing.
+
+Suspense wins because the position is genuinely unreconciled — we have taken
+180.00 from a customer against an authorisation we have no record of — and
+parking it somewhere named makes it a balance an operator can see and age.
+Folded into clearing it disappears into a large, busy account. This is also
+what REJECTED .md said should happen to a force post, so the chart now
+implements the argument rather than merely asserting it.
 
 **What is still missing.** These are contra accounts, not a chart of accounts:
 no account lifecycle, no posting-rule templates, no general ledger mapping.
 Enumerated in §4 of the architecture document.
 
 ---
+
+<a id="a23"></a>
 
 ## A23. Is a hold a posting?
 
@@ -474,6 +561,8 @@ entries, which is why it is also the one that cannot unbalance the book.
 
 
 ---
+
+<a id="a24"></a>
 
 ## A24. Does reversing a settlement reopen the authorisation it settled?
 

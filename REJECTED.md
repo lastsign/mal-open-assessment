@@ -1,10 +1,34 @@
 # Refused criteria, and approaches abandoned mid-build
 
-## Part 1 — acceptance criteria refused
+## Verdict
 
-Five of the eight stated criteria are wrong. Each refusal below is backed by a
+**Five of the eight stated criteria are wrong.** Each refusal is backed by a
 test in `tests/test_criteria.py` that asserts the criterion **false** rather
 than encoding it.
+
+| | criterion, in short | verdict |
+|---|---|---|
+| 1 | Day 2 restates to −370.00 | ✅ correct — nothing to argue |
+| [2](#c2) | E7 causes exactly one fee, on Day 2 | ❌ **refused** — three fees, or one on Day 5 |
+| 3 | The Day 4 settlement of Auth-A is accepted | ✅ correct — nothing to argue |
+| [4](#c4) | An unmatched settlement must be rejected | ❌ **refused** — it is a force post |
+| [5](#c5) | A hold moves available, not ledger, balance | ⚠️ true, but Auth-B is never approved |
+| [6](#c6) | After E9 everything returns to pre-E7 values | ❌ **refused** — the fees stand |
+| [7](#c7) | Three instalments of BHD 3.334 | ❌ **refused** — that is 10.002 |
+| [8](#c8) | Discard the interest rounding remainder | ❌ **refused** — contradicts the brief's own rule |
+
+Criteria 1 and 3 are correct and get no section here; they are tested in
+`tests/test_criteria.py` like the rest.
+
+Criterion 2 is the one worth reading first: it is false under *either*
+resolution of the backdating ambiguity, so refusing it costs no bet on my own
+interpretation.
+
+---
+
+## Part 1 — the criteria, one at a time
+
+<a id="c2"></a>
 
 ### Criterion 2 — "E7 causes exactly one overdraft fee to be assessed, on Day 2" — REFUSED
 
@@ -33,6 +57,8 @@ with E7 in hand. That is one fee, but not on Day 2.
 So the criterion is wrong on the count, or wrong on the day, and there is no
 resolution of the ambiguity under which it is right.
 
+<a id="c4"></a>
+
 ### Criterion 4 — "Any settlement referencing an authorization ID not present in the ledger must be rejected and the funds must not leave the account" — REFUSED
 
 E6 is a settlement for Auth-Z with no preceding authorisation. That is not a
@@ -60,17 +86,21 @@ should not be accepted unconditionally. It should be matched against a
 scheme-supplied clearing reference and an amount tolerance, and one that fails
 those checks should go to suspense rather than to the customer's account.
 
+<a id="c6"></a>
+
 ### Criterion 6 — "After E9, all balances and fees return to their pre-E7 values" — REFUSED
 
 Two separate errors.
 
-**Fees do not rewind.** The ledger is append-only. E9 is a new contra credit of
-+620.00 value-dated Day 2; it does not remove E7, and nothing in it removes the
-three fee entries either. Whether a fee is refunded when the entry that caused
-it is reversed is a *policy* decision — many banks refund on a fee-reversal
-request, some refund automatically, some do not refund at all — and no such
-policy was stated. I refuse to invent one silently, so the fees stand and the
-question is raised in AMBIGUITIES.md.
+**Fees do not rewind.** The ledger is append-only. E9 is a new contra credit
+of +620.00 value-dated Day 2; it does not remove E7, and nothing in it removes
+the three fee entries either.
+
+Whether a fee is refunded when the entry that caused it is reversed is a
+*policy* decision — many banks refund on a fee-reversal request, some refund
+automatically, some do not refund at all — and no such policy was stated. I
+refuse to invent one silently, so the fees stand and the question is raised in
+AMBIGUITIES.md.
 
 **Balances therefore do not return either.** Because the fees stand, Day 2
 closes at **225.00**, not the pre-E7 250.00, and Day 6 at 210.70 rather than
@@ -81,6 +111,8 @@ wrong description of what an append-only ledger does. The balance may again
 *equal* its earlier value; the ledger does not return to an earlier state. Four
 entries now stand where one did, and the audit trail is the point.
 
+<a id="c7"></a>
+
 ### Criterion 7 — "The three BHD instalments in E10 must each be BHD 3.334" — REFUSED
 
 3.334 × 3 = 10.002. BHD 10.000 does not divide into three equal parts at three
@@ -90,6 +122,8 @@ account that the event never carried — money created by a rounding rule.
 Correct split: **3.334 / 3.333 / 3.333**, summing to exactly 10.000. The
 remainder is placed on the first instalment by a fixed rule, so the same input
 always produces the same instalments and a replay reconciles.
+
+<a id="c8"></a>
 
 ### Criterion 8 — "If the rounded daily interest accruals do not sum to the capitalized total, the remainder is discarded" — REFUSED
 
@@ -107,6 +141,8 @@ discard policy leaks value the same way every day, on every account, forever —
 and the ledger stops balancing against the interest expense it books. This
 ledger apportions instead: the capitalised credit is the rounded true total,
 and the published daily figures are fitted to it by largest remainder.
+
+<a id="c5"></a>
 
 ### Criterion 5 — "If Auth-B is approved, its hold reduces available balance but not ledger balance" — ACCEPTED, WITH ITS PREMISE DENIED
 
@@ -163,8 +199,10 @@ per event: a credit to a customer account came from nowhere and a fee debited
 the customer without crediting anything. Every customer-facing number in this
 repository was already correct at that point, which is exactly what made it
 worth changing — the balances were right and the book could not be *proved*
-right. There was no trial balance, no way to see where the force-posted 180.00
-had gone, and §2 of the architecture document was discussing reconciliation
+right.
+
+There was no trial balance, no way to see where the force-posted 180.00 had
+gone, and §2 of the architecture document was discussing reconciliation
 against a general ledger that this design had no structure to reconcile with.
 Replaced with validated two-sided postings and a minimal chart. The customer
 balances did not move; the difference is that now they cannot silently drift.
@@ -187,14 +225,15 @@ The change cost about an hour because the commit path had been built for it --
 postings were already grouped and validated as a set, so the transaction needed
 an identity rather than a migration.
 
-**Appending postings one at a time.** The natural way to write the double-entry
-change was to keep the existing `_post` and call it twice. Rejected: an event
-that raises between its two legs would leave a one-sided entry in an
-append-only log, where nothing can remove it. The commit path buffers the
-postings, validates that they sum to zero in every currency, and only then
-appends — so an unbalanced transaction leaves no trace rather than half of
-one. It also happens to be the seam a `Transaction` record needs later, which
-made the more careful version the cheaper one.
+**Appending postings one at a time.** The natural way to write the double-
+entry change was to keep the existing `_post` and call it twice. Rejected: an
+event that raises between its two legs would leave a one-sided entry in an
+append-only log, where nothing can remove it.
+
+The commit path buffers the postings, validates that they sum to zero in every
+currency, and only then appends — so an unbalanced transaction leaves no trace
+rather than half of one. It also happens to be the seam a `Transaction` record
+needs later, which made the more careful version the cheaper one.
 
 **`Decimal` for money.** Dropped in favour of `int` minor units plus `Fraction`
 for intermediate interest. `Decimal` carries a context — precision and rounding

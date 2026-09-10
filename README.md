@@ -1,13 +1,49 @@
 # In-memory account ledger core
 
-An append-only, value-dated ledger for two accounts over a six-day window. No
-web layer, no persistence, no database, no dependencies beyond `pytest`.
+An append-only, value-dated, double-entry ledger for two accounts over a
+six-day window. No web layer, no persistence, no database, and no dependencies
+beyond `pytest`.
 
-Start with **REJECTED.md** — five of the eight stated acceptance criteria are
-wrong, and that document is the substance of the submission. **AMBIGUITIES.md**
-records every question the brief left open and what each answer costs.
-**NUMBERS.md** covers the constants, and **SOURCES.md** records what the
-jurisdiction-specific claims rest on and where the checked material ends.
+## Where to start
+
+| if you have | read |
+|---|---|
+| **two minutes** | the results below |
+| **fifteen** | [REJECTED.md](REJECTED.md), then `make run` |
+| **an hour** | REJECTED → [AMBIGUITIES.md](AMBIGUITIES.md) → [NUMBERS.md](NUMBERS.md) → `doc/architecture.pdf` |
+
+| document | answers |
+|---|---|
+| [REJECTED.md](REJECTED.md) | which acceptance criteria are wrong, and what was abandoned mid-build |
+| [AMBIGUITIES.md](AMBIGUITIES.md) | 24 questions the brief left open, indexed, with what each costs |
+| [NUMBERS.md](NUMBERS.md) | every constant, with its sensitivity measured rather than asserted |
+| [SOURCES.md](SOURCES.md) | what the jurisdiction claims rest on, and where checked material ends |
+| [WORKLOG.md](WORKLOG.md) | what happened, in order, including the parts that went wrong |
+| `doc/architecture.pdf` | Part 2 — scale, regulation, authorisation lifecycle, cuts |
+
+## Results
+
+**Five of the eight acceptance criteria are wrong** — 2, 4, 6, 7 and 8.
+Criterion 5 is true but describes a branch this stream never reaches, because
+Auth-B is declined. The reasoning is in REJECTED.md; each refusal has a test
+that asserts the criterion false rather than encoding it.
+
+The figures the replay produces:
+
+| | |
+|---|---|
+| overdraft fees | **three**, value-dated Days 2, 4 and 5, all assessed on Day 5 |
+| ACC-001 at Day 6 | **210.70 AED** — it closed Day 5 at −410.00 |
+| capitalised interest | **0.70 AED**, apportioned `0.10 0.09 0.25 0.10 0.08 0.08` |
+| ACC-002 instalments | **3.334 / 3.333 / 3.333 BHD**, summing to exactly 10.000 |
+| ACC-002 interest | **0.008 BHD**, exact, no apportionment needed |
+| unreconciled | **180.00 AED** in suspense — the settlement that matched no authorisation |
+| trial balance | zero in both currencies, on every day |
+
+One test fails on purpose. It shows that overdraft assessment in this design
+depends on the *arrival order* of events rather than on the log: the same
+entries produce three fees or none depending on whether a correction is booked
+before or after midnight. See [the failing test](#the-failing-test).
 
 ## Running it
 
