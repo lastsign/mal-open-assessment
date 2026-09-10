@@ -54,3 +54,41 @@ def test_both_policies_render(report: str) -> None:
     assert "overdraft-fee policy: point-in-time" in pit
     assert "overdraft-fee policy: retroactive" in report
     assert pit != report
+
+
+def test_trial_balance_is_grouped_by_currency_and_cancels(report: str) -> None:
+    """Structure, not spacing.
+
+    The column widths are tuned to the figures actually shown, so asserting
+    exact padding would make this test fail every time the layout improves.
+    What must hold is that each currency gets its own block and that the block
+    adds up to nothing.
+    """
+    block = report[report.index("Trial balance") :]
+    lines = [line for line in block.splitlines() if line.strip()]
+
+    blocks: dict[str, list[list[str]]] = {}
+    current = ""
+    for line in lines[2:]:
+        if not line.startswith("    "):
+            current = line.strip()
+            blocks[current] = []
+        elif set(line.strip()) != {"-"}:  # skip the rule above each total
+            blocks[current].append(line.split())
+
+    assert list(blocks) == ["AED", "BHD"], "one block per currency, in order"
+
+    assert ["ACC-001", "210.70"] in blocks["AED"]
+    assert ["SUSPENSE-AED", "180.00"] in blocks["AED"]
+    assert ["INCOME-FEES-AED", "75.00"] in blocks["AED"]
+    assert blocks["AED"][-1] == ["sum", "0.00"]
+
+    assert ["ACC-002", "10.008"] in blocks["BHD"]
+    assert blocks["BHD"][-1] == ["sum", "0.000"]
+
+
+def test_the_two_currencies_are_never_added_together(report: str) -> None:
+    # A single figure summing AED and BHD would be meaningless, and its
+    # absence is the point of grouping.
+    block = report[report.index("Trial balance") :]
+    assert block.count("sum") == 2

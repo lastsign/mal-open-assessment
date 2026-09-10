@@ -84,17 +84,28 @@ placed. See AMBIGUITIES A5.
 
 ```
 Trial balance at end of Day 6
-  ACC-001                     210.70 AED
-  SUSPENSE-AED                180.00 AED
-  INCOME-FEES-AED              75.00 AED
-  sum of all AED accounts        0.00 AED
+  AED
+    ACC-001                210.70
+    CLEARING-AED          -465.00
+    SUSPENSE-AED           180.00
+    INCOME-FEES-AED         75.00
+    EXPENSE-INTEREST-AED    -0.70
+                          -------
+    sum                      0.00
 ```
 
-Finally the whole book, per account and then summed. Postings are double-entry,
-so every currency must cancel to zero; if a line here is non-zero the ledger is
-broken and the tests say so before the report does. `SUSPENSE-AED` holds the
-force-posted settlement that matched no authorisation — an unreconciled
-position, deliberately parked somewhere an operator can see it.
+Finally the whole book. Postings are double-entry, so every currency must
+cancel to zero; if a `sum` line here is non-zero the ledger is broken, and the
+tests say so before the report does.
+
+It is grouped by currency rather than listed flat, because a column mixing AED
+and BHD could not be added up — and because within one currency every figure
+carries the same scale, so the decimal points align without any special
+handling. There is deliberately no grand total across currencies.
+
+`SUSPENSE-AED` holds the force-posted settlement that matched no
+authorisation: an unreconciled position, parked somewhere an operator can see
+and age it.
 
 ## The failing test
 

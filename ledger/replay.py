@@ -189,16 +189,42 @@ def _interest(book: Ledger) -> list[str]:
     return rows
 
 
+def _amount(value: Money) -> str:
+    """The number alone: in a grouped report the block header carries the code."""
+    return str(value).rsplit(" ", 1)[0]
+
+
 def _trial_balance(book: Ledger) -> list[str]:
-    """Every account in the chart, and the proof that they cancel."""
-    rows = ["Trial balance at end of Day 6", "-" * 66]
-    for account in book.chart:
-        balance = book.closing_balance(account, WINDOW)
-        if balance.minor == 0 and account not in CUSTOMERS:
-            continue
-        rows.append(f"  {account:<22}{_pad(str(balance), 16)}")
-    for currency, total in sorted(book.trial_balance(WINDOW).items()):
-        rows.append(f"  {'sum of all ' + currency + ' accounts':<22}{_pad(str(Money(total, currency)), 16)}")
+    """Every account grouped by currency, and the proof that each block cancels.
+
+    Grouped rather than listed flat for two reasons. A trial balance that mixes
+    currencies cannot be added up, so a single column of them is not a trial
+    balance at all. And within one currency every amount carries the same
+    number of decimal places, so right-justifying the figures lines the decimal
+    points up without any special handling.
+    """
+    rows = [f"Trial balance at end of Day {WINDOW}", "-" * 66]
+    by_currency: dict[Currency, list[str]] = {}
+    for account_id, account in book.chart.items():
+        by_currency.setdefault(account.currency, []).append(account_id)
+
+    for currency in sorted(by_currency):
+        shown = [
+            account_id
+            for account_id in by_currency[currency]
+            if book.closing_balance(account_id, WINDOW).minor != 0
+            or account_id in CUSTOMERS
+        ]
+        width = max(len(account_id) for account_id in shown)
+        total = Money(book.trial_balance(WINDOW)[currency], currency)
+        figures = [_amount(book.closing_balance(a, WINDOW)) for a in shown]
+        money = max(len(f) for f in figures + [_amount(total)])
+
+        rows.append(f"  {currency}")
+        for account_id, figure in zip(shown, figures):
+            rows.append(f"    {account_id:<{width}}  {figure:>{money}}")
+        rows.append(f"    {'':<{width}}  {'-' * money}")
+        rows.append(f"    {'sum':<{width}}  {_amount(total):>{money}}")
     return rows
 
 
