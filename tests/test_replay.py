@@ -5,6 +5,7 @@ import pytest
 from ledger.core import FeePolicy
 from ledger.money import AED, BHD, Money
 from ledger.replay import CUSTOMERS, replay
+from tests.helpers import customer_legs, postings
 
 
 @pytest.fixture(scope="module")
@@ -22,11 +23,7 @@ def _fees(book) -> list[tuple[int, int]]:
 
     Each fee is two postings now; the customer leg is the one being counted.
     """
-    return [
-        (e.value_date, e.booked_day)
-        for e in book.entries
-        if e.kind == "FEE" and e.account in CUSTOMERS
-    ]
+    return [(t.value_date, t.booked_day) for t, _ in customer_legs(book, kind="FEE")]
 
 
 def _closings(book, account) -> list[str]:
@@ -38,12 +35,9 @@ def _closings(book, account) -> list[str]:
 
 def test_day2_restated_before_any_fee_is_minus_370(retro) -> None:
     # 1,200.00 - 950.00 - 620.00. E3 is a hold and moves no ledger money.
-    fee_entries = {e.seq for e in retro.entries if e.kind == "FEE"}
     total = Money.zero(AED)
-    for entry in retro.entries:
-        if entry.account == "ACC-001" and entry.value_date <= 2 and entry.seq not in fee_entries:
-            if entry.kind == "REVERSAL":
-                continue
+    for transaction, entry in postings(retro, account="ACC-001"):
+        if transaction.value_date <= 2 and transaction.kind in ("CREDIT", "DEBIT"):
             total = total + entry.amount
     assert str(total) == "-370.00 AED"
 
@@ -95,7 +89,7 @@ def test_the_fee_itself_feeds_the_next_days_balance(retro) -> None:
     # Day 3 would close at +30.00 on the raw entries; the Day 2 fee brings it
     # to +5.00, which is still positive and so escapes a fee of its own.
     assert str(retro.closing_balance("ACC-001", 3)) == "625.00 AED"
-    assert any(e.kind == "FEE" and e.value_date == 2 for e in retro.entries)
+    assert any(t.value_date == 2 for t, _ in customer_legs(retro, kind="FEE"))
 
 
 # ----------------------------------------------------------------- interest
@@ -103,20 +97,14 @@ def test_the_fee_itself_feeds_the_next_days_balance(retro) -> None:
 
 def test_daily_accruals_sum_exactly_to_the_capitalised_credit(retro) -> None:
     accruals = retro.daily_accruals("ACC-001")
-    credit = next(
-        e for e in retro.entries
-        if e.kind == "INTEREST" and e.account == "ACC-001"
-    )
+    _, credit = next(iter(customer_legs(retro, kind="INTEREST", account="ACC-001")))
     assert sum(accruals) == credit.amount.minor
     assert str(credit.amount) == "0.70 AED"
     assert accruals == [10, 9, 25, 10, 8, 8]
 
 
 def test_bhd_interest_needs_no_apportionment(retro) -> None:
-    credit = next(
-        e for e in retro.entries
-        if e.kind == "INTEREST" and e.account == "ACC-002"
-    )
+    _, credit = next(iter(customer_legs(retro, kind="INTEREST", account="ACC-002")))
     assert str(credit.amount) == "0.008 BHD"
     assert retro.daily_accruals("ACC-002") == [0, 0, 0, 0, 4, 4]
 
@@ -127,12 +115,9 @@ def test_interest_ignores_days_that_closed_at_or_below_zero(retro) -> None:
 
 
 def test_interest_is_credited_once_on_day_six(retro) -> None:
-    credits = [
-        e for e in retro.entries
-        if e.kind == "INTEREST" and e.account in CUSTOMERS
-    ]
+    credits = customer_legs(retro, kind="INTEREST")
     assert len(credits) == 2  # one per customer account
-    assert {e.value_date for e in credits} == {6}
+    assert {t.value_date for t, _ in credits} == {6}
 
 
 # ----------------------------------------------------------- append-only
@@ -145,9 +130,9 @@ def test_sequence_numbers_are_dense_and_ordered(retro) -> None:
 
 
 def test_the_reversal_adds_a_record_rather_than_removing_one(retro) -> None:
-    e7 = [e for e in retro.entries if e.event_id == "E7" and e.account == "ACC-001"]
-    e9 = [e for e in retro.entries if e.event_id == "E9" and e.account == "ACC-001"]
+    e7 = postings(retro, event_id="E7", account="ACC-001")
+    e9 = postings(retro, event_id="E9", account="ACC-001")
     assert len(e7) == 1 and len(e9) == 1
-    assert e7[0].amount == -e9[0].amount
-    assert e9[0].value_date == e7[0].value_date == 2
-    assert e9[0].booked_day == 6
+    assert e7[0][1].amount == -e9[0][1].amount
+    assert e9[0][0].value_date == e7[0][0].value_date == 2
+    assert e9[0][0].booked_day == 6

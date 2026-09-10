@@ -196,6 +196,33 @@ The thing I want to remember from this: every finding was in a path the tests
 did not cover, and I had been reading the coverage as though green meant
 checked. It meant the six days in the brief work.
 
+**17:08 — split the posting from the transaction.**
+The question that started it: does a ledger store anything other than debits
+and credits? It does not, and mine was storing more. `Entry` carried a `kind`
+field, which meant the contra leg of a credit was a negative amount labelled
+`CREDIT`. The label described the event; it lived on the posting; it
+contradicted half the log.
+
+Built the `Transaction` layer. An entry is now an account, a signed amount and
+a reference; everything true of all the legs -- dates, operation type, the
+originating event -- moved up. It took about an hour, and the reason it took
+an hour rather than a rewrite is the decision made earlier today to buffer,
+validate and append postings as a set: the transaction already existed in all
+but name.
+
+The real argument for doing it is not tidiness. A ledger core that grows a new
+enum member for every product is not a core. A loan, a term deposit, a standing
+order should each be a new chart entry and a new posting rule; the ledger does
+not know what a loan is, only that some event resolved into postings that
+balanced. That property is now testable, and tested: `Entry` has exactly four
+fields and none of them is a product word.
+
+Report output is byte-identical under both policies -- verified by diff, which
+is the only reason I trust a change that touched every handler. Twenty-five
+tests failed on the first run, all of them reading `entry.kind` or a date that
+had moved; they now join the entry to its transaction, which is the shape a
+reporting query would take anyway.
+
 ---
 
 ## Still to do

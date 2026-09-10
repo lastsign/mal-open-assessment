@@ -17,7 +17,7 @@ Python 3.12 or newer.
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[test]'
 
-make test      # full suite: 99 pass, 1 xfail (the deliberate one)
+make test      # full suite: 102 pass, 1 xfail (the deliberate one)
 make run       # replay the six days and print the report
 make run-pit   # the same replay under the alternative fee policy
 make gap       # run the failing test unmasked, so it shows red
@@ -127,13 +127,18 @@ toolchain).
 ```
 ledger/money.py    Money as integer minor units; exact allocation and apportionment
 ledger/events.py   The input stream: booking day and value date, kept separate
-ledger/core.py     The append-only log, the chart, and every view derived from it
+ledger/core.py     Transactions, postings, the chart, and the views over them
 ledger/replay.py   The six-day replay and the report
 tests/             Primitives, the replay, one test per criterion, and the gap
 doc/               Architecture & trade-offs document (LaTeX source and PDF)
 ```
 
 ## Design in one paragraph
+
+The ledger is layered: an entry is an account and a signed amount, a
+transaction carries what is true of all its legs, and handlers turn business
+events into balanced postings. A new product should be a new chart entry and a
+new posting rule, not a new type in the core.
 
 Money is an `int` in a currency's own minor units, inseparable from its
 currency; the scale lives in one registry rather than on each entry, and no

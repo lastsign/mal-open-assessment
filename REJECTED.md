@@ -169,6 +169,24 @@ against a general ledger that this design had no structure to reconcile with.
 Replaced with validated two-sided postings and a minimal chart. The customer
 balances did not move; the difference is that now they cannot silently drift.
 
+**The operation type on the posting.** `Entry` carried a `kind` field --
+`CREDIT`, `FEE`, `SETTLEMENT` and so on -- and it was wrong in a way visible
+from the code rather than only in principle: the contra leg of a credit was a
+*negative* amount labelled `CREDIT`, and the contra leg of a debit a positive
+one labelled `DEBIT`. The field described the event while sitting on the
+posting, so it contradicted half the entries it annotated.
+
+Moved to a `Transaction` record, which is where facts true of every leg belong
+-- value date, booking date, operation type, the event that caused it. An entry
+is now an account and a signed amount and nothing else. The test that matters:
+a loan or a term deposit should be a new chart entry and a new posting rule,
+never a new member of an enum inside the ledger core, and that only stays true
+while the core's own records are free of product vocabulary.
+
+The change cost about an hour because the commit path had been built for it --
+postings were already grouped and validated as a set, so the transaction needed
+an identity rather than a migration.
+
 **Appending postings one at a time.** The natural way to write the double-entry
 change was to keep the existing `_post` and call it twice. Rejected: an event
 that raises between its two legs would leave a one-sided entry in an

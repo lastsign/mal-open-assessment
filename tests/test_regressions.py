@@ -17,6 +17,7 @@ from ledger.core import (
 from ledger.events import Credit, Debit, Reversal, Settlement
 from ledger.money import AED, BHD, CurrencyMismatch, Money
 from ledger.replay import CHART, WINDOW, render, replay, stream
+from tests.helpers import customer_legs
 
 
 def _without(*event_ids: str):
@@ -51,10 +52,10 @@ def test_a_posting_to_an_account_outside_the_chart_is_refused() -> None:
     book = Ledger(CHART)
     with pytest.raises(NoSuchAccount):
         book._commit(
-            "X2", 1, 1,
+            "X2", "CREDIT", 1, 1,
             [
-                Posting("TYPO-ACC", Money(100, AED), "CREDIT"),
-                Posting("CLEARING-AED", Money(-100, AED), "CREDIT"),
+                Posting("TYPO-ACC", Money(100, AED)),
+                Posting("CLEARING-AED", Money(-100, AED)),
             ],
         )
     assert book.entries == ()
@@ -90,7 +91,8 @@ def test_a_close_that_cannot_charge_one_customer_charges_none_of_them() -> None:
     book.post_event(Debit("D2", 1, 1, "ACC-002", Money(10_000, BHD)))
     with pytest.raises(UndefinedFeeCurrency):
         book.close_day(1)
-    assert [e for e in book.entries if e.kind == "FEE"] == []
+    # The two debits stand; no fee was committed and no day was closed.
+    assert [t for t in book.transactions if t.kind == "FEE"] == []
     assert book.snapshots == {}
 
 
@@ -98,7 +100,7 @@ def test_a_solvent_foreign_currency_account_does_not_block_the_close() -> None:
     # The guard must fire on an account that would be charged, not on every
     # account the fee schedule happens not to name.
     book = replay(policy=FeePolicy.RETROACTIVE)
-    assert len([e for e in book.entries if e.kind == "FEE"]) == 6  # 3 fees, both legs
+    assert len(customer_legs(book, kind="FEE")) == 3
 
 
 # 5 -------------------------------------------------------------------------

@@ -331,29 +331,37 @@ original amount added back.
         Deferred risk is \S1 in full.
 \end{description}
 
-Beyond those, the postings are double-entry and the book proves it --- every
-transaction sums to zero per currency before anything is appended, and a trial
-balance cancels on every day --- but a ledger \term{core} in production is
-wider than that, and the rest is absent by choice rather than by oversight.
-There is no \term{transaction} record grouping postings into a journal entry
-with its own identity, only the event id they share; the chart is the minimum
-that lets each event balance, with no account lifecycle (open, closed, frozen,
-dormant) and no posting-rule templates, so what debits what is written into
-handlers rather than configured; only two balance types exist where production
-tracks booked, available, cleared, blocked and pending; there is no accounting
-period, closing entry or statement generation; no reconciliation against an
-external clearing file and no ageing of the suspense position the force post
-creates; no dispute or chargeback lifecycle, so everything after settlement is
-out of scope; no limits or velocity checks beyond the available-balance test;
-and nothing is published outbound, so no downstream system can learn that any
-of this happened.
+Beyond those, the model is layered the way a ledger core has to be if it is to
+outlive its first product. An \term{entry} is an account and a signed amount:
+no dates, no product vocabulary. A \term{transaction} carries what is true of
+all its legs --- the value date, the booking date, the kind of operation, the
+event that caused it --- and the postings that make it up are validated as a
+set and appended together. Handlers turn business events into balanced
+postings.
 
-Each of those is a day of work rather than a rethink, which is why they are
-cuts and not risks --- with one exception. The transaction record is the one I
-designed \term{for}: the commit path buffers postings, validates them as a set
-and appends them together, so adding an identity to that unit is an addition
-rather than a migration. The others would each need a decision I was not given
-enough to make.
+That boundary is not decoration. It is the test of whether this is a ledger
+core or a card-payments script: a loan, a term deposit or a standing order
+should be a new chart entry and a new posting rule, not a new member of an
+enum inside the core. The ledger does not know what a loan \term{is}; it knows
+that some event resolved into postings that balanced. When the operation type
+lived on the entry instead, the design was already failing that test in a way
+visible from the code --- a contra leg carrying a negative amount labelled
+\textsc{credit}, a field describing the event while sitting on the posting.
+
+What remains cut is real and chosen. The chart is the minimum that lets each
+event balance, with no account lifecycle --- open, closed, frozen, dormant ---
+and posting rules are written into handlers rather than configured, so a new
+product still means new code even though it no longer means new core types.
+Only two balance types exist where production tracks booked, available,
+cleared, blocked and pending. There is no accounting period, closing entry or
+statement generation; no reconciliation against an external clearing file and
+no ageing of the suspense position a force post creates; no dispute or
+chargeback lifecycle, so everything after settlement is out of scope; no limits
+or velocity checks beyond the available-balance test; and nothing is published
+outbound, so no downstream system can learn that any of this happened.
+
+Each is a day of work rather than a rethink, which is why they are cuts and not
+risks. Each would also need a decision I was not given enough to make.
 
 
 \section*{Sources}

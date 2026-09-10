@@ -140,10 +140,10 @@ def _fees(book: Ledger, day: Day) -> list[str]:
     return [
         _line(
             "fee",
-            f"{fee.account}  {fee.amount}  "
-            f"(assessed on Day {fee.booked_day}, value-dated Day {day})",
+            f"{entry.account}  {entry.amount}  "
+            f"(assessed on Day {transaction.booked_day}, value-dated Day {day})",
         )
-        for fee in fees
+        for transaction, entry in fees
     ]
 
 

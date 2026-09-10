@@ -71,7 +71,9 @@ class NoSuchAccount(Exception):
     """The chart of accounts has no account to post the other side against."""
 
 
-EntryKind = Literal["CREDIT", "DEBIT", "SETTLEMENT", "FEE", "INTEREST", "REVERSAL"]
+TransactionKind = Literal[
+    "CREDIT", "DEBIT", "SETTLEMENT", "FEE", "INTEREST", "REVERSAL"
+]
 Outcome = Literal["APPROVED", "DECLINED", "FORCE_POSTED", "REJECTED", "REVERSED"]
 HoldState = Literal["ACTIVE", "SETTLED", "RELEASED", "DECLINED"]
 
@@ -85,26 +87,43 @@ class Account:
 
 @dataclass(frozen=True, slots=True)
 class Posting:
-    """One side of a transaction, before it is committed to the log."""
+    """One side of a transaction, before it is committed to the log.
+
+    An account and a signed amount. Nothing else: whether this leg belongs to
+    a fee or to a settlement is a fact about the transaction, and putting it
+    here produced labels that contradicted the amounts they sat on -- a
+    contra leg carrying a negative amount marked CREDIT.
+    """
 
     account: str
     amount: Money
-    kind: EntryKind
-    note: str = ""
-    reverses: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class Entry:
-    """One committed posting. Signed: positive increases the account's balance."""
+    """One committed posting. Signed: positive increases the account's balance.
+
+    Carries no product vocabulary and no dates. Both live on the transaction
+    it belongs to, which is what lets a new product be a new posting rule
+    rather than a change to the ledger core.
+    """
 
     seq: int
-    event_id: str
+    transaction: str
     account: str
     amount: Money
+
+
+@dataclass(frozen=True, slots=True)
+class Transaction:
+    """A balanced set of postings, and everything that is true of all of them."""
+
+    seq: int
+    id: str
+    event_id: str
+    kind: TransactionKind
     value_date: Day
     booked_day: Day
-    kind: EntryKind
     note: str = ""
     reverses: str = ""
 
@@ -143,6 +162,8 @@ class Ledger:
             a.id for a in chart.values() if a.kind is AccountKind.CUSTOMER
         ]
         self._fee_policy = fee_policy
+        self._transactions: list[Transaction] = []
+        self._by_id: dict[str, Transaction] = {}
         self._entries: list[Entry] = []
         self._decisions: list[Decision] = []
         self._holds: list[HoldEvent] = []
@@ -189,32 +210,18 @@ class Ledger:
         self._seq += 1
         return self._seq
 
-    def _commit(
-        self,
-        event_id: str,
-        value_date: Day,
-        booked_day: Day,
-        postings: list[Posting],
-    ) -> list[Entry]:
-        """Append a balanced set of postings, or none of them.
-
-        Validation runs before the first append, so an unbalanced transaction
-        cannot leave a partial trace. This is also the seam a `Transaction`
-        record would slot into later: by the time control reaches here the
-        postings are already grouped, validated and committed as one unit, so
-        giving that unit an identity is an addition rather than a rewrite.
-        """
+    def _validate(self, event_id: str, postings: list[Posting]) -> None:
+        """Refuse anything that would corrupt a log which cannot delete."""
         totals: dict[Currency, int] = defaultdict(int)
         for posting in postings:
-            # Zero-sum is not enough. An AED posting into a BHD account nets
-            # to zero against its own contra and then poisons every later
-            # balance query on a log that cannot delete it.
             account = self._chart.get(posting.account)
             if account is None:
                 raise NoSuchAccount(
                     f"{event_id}: {posting.account!r} is not in the chart"
                 )
             if posting.amount.currency != account.currency:
+                # Nets to zero against its own contra and then poisons every
+                # later balance query on the account it landed in.
                 raise CurrencyMismatch(
                     f"{event_id}: {posting.amount.currency} posting into "
                     f"{posting.account}, which is {account.currency}"
@@ -224,29 +231,53 @@ class Ledger:
         if unbalanced:
             raise Unbalanced(f"{event_id}: {unbalanced}")
 
-        committed = [
-            Entry(
-                seq=self._next_seq(),
-                event_id=event_id,
-                account=posting.account,
-                amount=posting.amount,
-                value_date=value_date,
-                booked_day=booked_day,
-                kind=posting.kind,
-                note=posting.note,
-                reverses=posting.reverses,
-            )
-            for posting in postings
-        ]
-        self._entries.extend(committed)
-        return committed
+    def _commit(
+        self,
+        event_id: str,
+        kind: TransactionKind,
+        value_date: Day,
+        booked_day: Day,
+        postings: list[Posting],
+        note: str = "",
+        reverses: str = "",
+    ) -> Transaction:
+        """Append a balanced set of postings as one transaction, or none of them.
+
+        Validation runs before the first append, so a transaction that does
+        not balance -- or that names an account the chart does not have --
+        leaves no trace rather than half of one.
+        """
+        self._validate(event_id, postings)
+        transaction = Transaction(
+            seq=self._next_seq(),
+            id=f"T{len(self._transactions) + 1:04d}",
+            event_id=event_id,
+            kind=kind,
+            value_date=value_date,
+            booked_day=booked_day,
+            note=note,
+            reverses=reverses,
+        )
+        self._transactions.append(transaction)
+        self._by_id[transaction.id] = transaction
+        self._entries.extend(
+            Entry(self._next_seq(), transaction.id, p.account, p.amount)
+            for p in postings
+        )
+        return transaction
 
     def _decide(self, event_id: str, day: Day, outcome: Outcome, reason: str) -> None:
         self._decisions.append(Decision(self._next_seq(), event_id, day, outcome, reason))
 
+    # ------------------------------------------------------------- views
+
     @property
     def entries(self) -> tuple[Entry, ...]:
         return tuple(self._entries)
+
+    @property
+    def transactions(self) -> tuple[Transaction, ...]:
+        return tuple(self._transactions)
 
     @property
     def decisions(self) -> tuple[Decision, ...]:
@@ -256,6 +287,17 @@ class Ledger:
     def holds(self) -> tuple[HoldEvent, ...]:
         return tuple(self._holds)
 
+    def transaction_of(self, entry: Entry) -> Transaction:
+        return self._by_id[entry.transaction]
+
+    def postings(self) -> list[tuple[Transaction, Entry]]:
+        """Every entry joined to the transaction that created it.
+
+        The join is what callers actually want: an entry alone cannot say
+        when it happened or why, and that is the point of the split.
+        """
+        return [(self._by_id[e.transaction], e) for e in self._entries]
+
     def authorisation_ids(self, day: Day) -> list[str]:
         """Every authorisation the ledger knows of as of `day`, in order."""
         return sorted({e.auth_id for e in self._holds if e.day <= day})
@@ -264,27 +306,25 @@ class Ledger:
         """The amount the authorisation was opened for."""
         return next(e for e in self._holds if e.auth_id == auth_id).amount
 
-    def fees_on(self, day: Day) -> list[Entry]:
+    def fees_on(self, day: Day) -> list[tuple[Transaction, Entry]]:
         return [
-            e for e in self._entries
-            if e.kind == "FEE" and e.value_date == day and e.account in self._customers
+            (t, e) for t, e in self.postings()
+            if t.kind == "FEE" and t.value_date == day and e.account in self._customers
         ]
-
-    # ------------------------------------------------------------- views
 
     def closing_balance(self, account: str, day: Day) -> Money:
         """Every entry with value_date <= day, whenever it was booked."""
         total = Money.zero(self.currency_of(account))
         for entry in self._entries:
-            if entry.account == account and entry.value_date <= day:
+            if entry.account == account and self._by_id[entry.transaction].value_date <= day:
                 total = total + entry.amount
         return total
 
     def trial_balance(self, day: Day) -> dict[Currency, int]:
         """Every account summed per currency. Must be zero in each of them."""
         totals: dict[Currency, int] = defaultdict(int)
-        for entry in self._entries:
-            if entry.value_date <= day:
+        for transaction, entry in self.postings():
+            if transaction.value_date <= day:
                 totals[entry.amount.currency] += entry.amount.minor
         return dict(totals)
 
@@ -327,24 +367,26 @@ class Ledger:
             case Reversal():
                 self._on_reversal(event)
 
+    def _two_sided(self, account: str, amount: Money, contra: str) -> list[Posting]:
+        """The customer leg and its mirror. Signs are opposite by construction."""
+        return [Posting(account, amount), Posting(contra, -amount)]
+
     def _on_credit(self, event: Credit) -> None:
         contra = self._contra(AccountKind.CLEARING, event.amount.currency)
-        postings: list[Posting] = []
         parts = allocate(event.amount, event.instalments)
-        for i, part in enumerate(parts, start=1):
-            note = f"instalment {i}/{event.instalments}" if event.instalments > 1 else ""
-            postings.append(Posting(event.account, part, "CREDIT", note))
-            postings.append(Posting(contra, -part, "CREDIT", note))
-        self._commit(event.event_id, event.value_date, event.booked_day, postings)
+        postings: list[Posting] = []
+        for part in parts:
+            postings += self._two_sided(event.account, part, contra)
+        note = f"{event.instalments} instalments" if event.instalments > 1 else ""
+        self._commit(
+            event.event_id, "CREDIT", event.value_date, event.booked_day, postings, note
+        )
 
     def _on_debit(self, event: Debit) -> None:
         contra = self._contra(AccountKind.CLEARING, event.amount.currency)
         self._commit(
-            event.event_id, event.value_date, event.booked_day,
-            [
-                Posting(event.account, -event.amount, "DEBIT"),
-                Posting(contra, event.amount, "DEBIT"),
-            ],
+            event.event_id, "DEBIT", event.value_date, event.booked_day,
+            self._two_sided(event.account, -event.amount, contra),
         )
 
     def _on_authorization(self, event: Authorization) -> None:
@@ -387,12 +429,9 @@ class Ledger:
         held = self.hold_amount(event.auth_id)
         contra = self._contra(AccountKind.CLEARING, event.amount.currency)
         self._commit(
-            event.event_id, event.value_date, event.booked_day,
-            [
-                Posting(event.account, -event.amount, "SETTLEMENT",
-                        f"settles {event.auth_id}"),
-                Posting(contra, event.amount, "SETTLEMENT", f"settles {event.auth_id}"),
-            ],
+            event.event_id, "SETTLEMENT", event.value_date, event.booked_day,
+            self._two_sided(event.account, -event.amount, contra),
+            f"settles {event.auth_id}",
         )
         self._holds.append(
             HoldEvent(self._next_seq(), event.auth_id, event.account,
@@ -412,13 +451,10 @@ class Ledger:
         rather than something buried inside the clearing account.
         """
         contra = self._contra(AccountKind.SUSPENSE, event.amount.currency)
-        note = "unmatched: force post"
         self._commit(
-            event.event_id, event.value_date, event.booked_day,
-            [
-                Posting(event.account, -event.amount, "SETTLEMENT", note),
-                Posting(contra, event.amount, "SETTLEMENT", note),
-            ],
+            event.event_id, "SETTLEMENT", event.value_date, event.booked_day,
+            self._two_sided(event.account, -event.amount, contra),
+            "unmatched: force post",
         )
         self._decide(
             event.event_id, event.booked_day, "FORCE_POSTED",
@@ -426,14 +462,14 @@ class Ledger:
         )
 
     def _on_reversal(self, event: Reversal) -> None:
-        originals = [e for e in self._entries if e.event_id == event.reverses]
+        originals = [t for t in self._transactions if t.event_id == event.reverses]
         if not originals:
             self._decide(
                 event.event_id, event.booked_day, "REJECTED",
                 f"nothing booked under {event.reverses}",
             )
             return
-        if any(e.reverses == event.reverses for e in self._entries):
+        if any(t.reverses in {o.id for o in originals} for t in self._transactions):
             self._decide(
                 event.event_id, event.booked_day, "REJECTED",
                 f"{event.reverses} is already reversed",
@@ -441,17 +477,21 @@ class Ledger:
             return
         # Reversing every leg of the original keeps the contra balanced for
         # free: a balanced transaction negated is still balanced.
-        self._commit(
-            event.event_id, event.value_date, event.booked_day,
-            [
-                Posting(o.account, -o.amount, "REVERSAL",
-                        f"reverses {event.reverses}", event.reverses)
-                for o in originals
-            ],
-        )
+        for original in originals:
+            self._commit(
+                event.event_id, "REVERSAL", event.value_date, event.booked_day,
+                [
+                    Posting(e.account, -e.amount)
+                    for e in self._entries if e.transaction == original.id
+                ],
+                f"reverses {event.reverses}",
+                reverses=original.id,
+            )
         reason = f"contra of {event.reverses}"
-        settled = {o.note.removeprefix("settles ") for o in originals
-                   if o.kind == "SETTLEMENT" and o.note.startswith("settles ")}
+        settled = {
+            o.note.removeprefix("settles ") for o in originals
+            if o.kind == "SETTLEMENT" and o.note.startswith("settles ")
+        }
         if settled:
             # Deliberate, and stated rather than left to be inferred: an
             # authorisation is consumed by settling, and returning the money
@@ -464,7 +504,7 @@ class Ledger:
 
     # ------------------------------------------------------------- close
 
-    def close_day(self, day: Day) -> list[Entry]:
+    def close_day(self, day: Day) -> list[Transaction]:
         """Assess overdraft fees for this close. Returns the fees booked."""
         days: tuple[Day, ...] = (
             tuple(range(1, day + 1))
@@ -472,7 +512,7 @@ class Ledger:
             else (day,)
         )
         self._refuse_unchargeable_fees(days)
-        booked: list[Entry] = []
+        booked: list[Transaction] = []
         for account in self.customers:
             # Ascending: a fee dated day D is itself an entry that drags
             # every later closing balance down, and may trigger the next fee.
@@ -508,30 +548,18 @@ class Ledger:
 
     def _maybe_assess_fee(
         self, account: str, value_date: Day, booked_day: Day
-    ) -> Entry | None:
-        already = any(
-            e.account == account and e.kind == "FEE" and e.value_date == value_date
-            for e in self._entries
-        )
-        if already:
+    ) -> Transaction | None:
+        if any(t.value_date == value_date for t, e in self.fees_on(value_date)
+               if e.account == account):
             return None
         if not self.closing_balance(account, value_date).is_negative:
             return None
-        if self.currency_of(account) != OVERDRAFT_FEE.currency:
-            raise UndefinedFeeCurrency(
-                f"{account} is {self.currency_of(account)} but the fee schedule "
-                f"is written in {OVERDRAFT_FEE.currency}; no rate was given. "
-                f"See AMBIGUITIES.md."
-            )
         income = self._contra(AccountKind.INCOME, OVERDRAFT_FEE.currency)
-        entries = self._commit(
-            f"FEE-{account}-D{value_date}", value_date, booked_day,
-            [
-                Posting(account, -OVERDRAFT_FEE, "FEE", "overdraft"),
-                Posting(income, OVERDRAFT_FEE, "FEE", "overdraft"),
-            ],
+        return self._commit(
+            f"FEE-{account}-D{value_date}", "FEE", value_date, booked_day,
+            self._two_sided(account, -OVERDRAFT_FEE, income),
+            "overdraft",
         )
-        return entries[0]
 
     def capitalize_interest(self, last_day: Day) -> None:
         """Accrue daily on positive closing balances, credit once at the end.
@@ -554,11 +582,9 @@ class Ledger:
             credit = Money(total, currency)
             expense = self._contra(AccountKind.EXPENSE, currency)
             self._commit(
-                f"INT-{account}", last_day, last_day,
-                [
-                    Posting(account, credit, "INTEREST", "capitalised accrual"),
-                    Posting(expense, -credit, "INTEREST", "capitalised accrual"),
-                ],
+                f"INT-{account}", "INTEREST", last_day, last_day,
+                self._two_sided(account, credit, expense),
+                "capitalised accrual",
             )
         # Capitalisation is part of the last day's close, not something that
         # arrived after it. Without this the report calls the credit a
