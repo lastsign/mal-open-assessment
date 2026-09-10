@@ -104,7 +104,8 @@ settled against, and the difference lands in a suspense account for someone to
 find later. "The funds must not leave the account" describes an outcome the
 ledger has no power to produce.
 
-**What this ledger does instead:** books the settlement in full, flags it
+**What this ledger does instead** — `_force_post` (ledger/core.py:446) —
+books the settlement in full, flags it
 `unmatched: force post`, and records a `FORCE_POSTED` decision so it surfaces
 in the day's errors and can be routed to exception handling. It is allowed to
 drive the balance negative, and any resulting overdraft fee is assessed
@@ -149,7 +150,8 @@ entries now stand where one did, and the audit trail is the point.
 decimal places, and crediting 3.334 three times would put 0.002 BHD into the
 account that the event never carried — money created by a rounding rule.
 
-Correct split: **3.334 / 3.333 / 3.333**, summing to exactly 10.000. The
+Correct split: **3.334 / 3.333 / 3.333**, summing to exactly 10.000, by
+`allocate` (ledger/money.py:104). The
 remainder is placed on the first instalment by a fixed rule, so the same input
 always produces the same instalments and a replay reconciles.
 
@@ -169,7 +171,8 @@ Discarding it is wrong for a reason beyond the contradiction: the error is not
 random. Half-up rounding of positive accruals biases in one direction, so a
 discard policy leaks value the same way every day, on every account, forever —
 and the ledger stops balancing against the interest expense it books. This
-ledger apportions instead: the capitalised credit is the rounded true total,
+ledger apportions instead — `apportion` (ledger/money.py:133): the capitalised
+credit is the rounded true total,
 and the published daily figures are fitted to it by largest remainder.
 
 <a id="c5"></a>

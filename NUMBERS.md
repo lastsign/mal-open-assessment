@@ -10,8 +10,8 @@ as choices.
 
 ## Overdraft fee — AED 25.00 (`OVERDRAFT_FEE`, 2500 minor)
 
-**Given.** Not chosen, but it is load-bearing, and closer to a cliff edge than
-it looks.
+**Given** — `OVERDRAFT_FEE` (ledger/core.py:41). Not chosen, but load-bearing,
+and closer to a cliff edge than it looks.
 
 The fee is itself a value-dated entry, so a fee on Day 2 lowers every later
 closing balance and can trigger the next fee. On this stream Day 3 closes at
@@ -39,8 +39,9 @@ implements compounding because a fee is an entry, and entries count.
 
 ## Daily interest rate — 0.04% per day (`DAILY_INTEREST_RATE`, `Fraction(4, 10_000)`)
 
-**Given.** Held as an exact rational, never as `0.0004`, which is not
-representable in binary floating point.
+**Given** — `DAILY_INTEREST_RATE` (ledger/core.py:42). Held as an exact
+rational, never as `0.0004`, which is not representable in binary floating
+point.
 
 | rate | capitalised (ACC-001) | daily accruals |
 |------|----------------------|----------------|

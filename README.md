@@ -71,6 +71,52 @@ depends on the *arrival order* of events rather than on the log: the same
 entries produce three fees or none depending on whether a correction is booked
 before or after midnight. See [the failing test](#the-failing-test).
 
+## How an event becomes a balance
+
+```mermaid
+flowchart TD
+    S["stream()<br/><i>ledger/replay.py:59</i>"] --> R["replay()<br/><i>ledger/replay.py:75</i>"]
+    R -->|"in booking-day order"| PE["post_event()<br/><i>ledger/core.py:357</i>"]
+
+    PE --> H{"event kind"}
+    H -->|credit / debit| TS["_two_sided()<br/><i>ledger/core.py:370</i>"]
+    H -->|settlement| SET["_on_settlement()<br/><i>ledger/core.py:411</i>"]
+    H -->|"settlement, no auth"| FP["_force_post()<br/>→ suspense<br/><i>ledger/core.py:446</i>"]
+    H -->|reversal| REV["_on_reversal()<br/><i>ledger/core.py:464</i>"]
+    H -->|authorisation| AU["_on_authorization()<br/><i>ledger/core.py:392</i>"]
+
+    TS --> C
+    SET --> C
+    FP --> C
+    REV --> C
+    AU -.->|"posts nothing"| HOLDS[("hold log")]
+
+    R -->|"end of each day"| CD["close_day()<br/><i>ledger/core.py:507</i>"]
+    CD --> RF["_refuse_unchargeable_fees()<br/><i>ledger/core.py:528</i>"]
+    RF --> MF["_maybe_assess_fee()<br/><i>ledger/core.py:549</i>"]
+    MF --> C
+    R -->|"end of Day 6"| CI["capitalize_interest()<br/><i>ledger/core.py:564</i>"]
+    CI --> C
+
+    C["_commit()<br/><i>ledger/core.py:234</i>"] --> V["_validate()<br/>account in chart?<br/>currency matches?<br/>sums to zero?<br/><i>ledger/core.py:213</i>"]
+    V -->|"all or nothing"| LOG[("transactions + entries<br/>append-only")]
+
+    LOG --> CB["closing_balance()<br/><i>ledger/core.py:315</i>"]
+    LOG --> TB["trial_balance()<br/><i>ledger/core.py:323</i>"]
+    HOLDS --> AB["available_balance()"]
+    CB --> AB
+    AB --> AU
+```
+
+Every `file:line` above is checked by `tests/test_documentation.py`, which
+opens the line and confirms the symbol is on it — a stale citation is worse
+than none, because it sends a reader somewhere wrong while looking
+authoritative.
+
+Everything that changes the log goes through one function. An authorisation is
+the only event that posts nothing — it writes to the hold log, which is why it
+is also the only one that cannot unbalance the book.
+
 ## Running it
 
 Python 3.12 or newer.
@@ -79,7 +125,7 @@ Python 3.12 or newer.
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[test]'
 
-make test      # full suite: 102 pass, 1 xfail (the deliberate one)
+make test      # full suite: 128 pass, 1 xfail (the deliberate one)
 make run       # replay the six days and print the report
 make run-pit   # the same replay under the alternative fee policy
 make gap       # run the failing test unmasked, so it shows red

@@ -77,7 +77,8 @@ fee is *"assessed once per day per account"*, which is the language of a batch
 that runs at a close. E7 arrives on Day 5 value-dated Day 2, so the two
 readings diverge and take every number with them.
 
-**Resolution.** Both are implemented, behind `FeePolicy`. The default is
+**Resolution.** Both are implemented, behind `FeePolicy`, and selected in
+`close_day` (ledger/core.py:507). The default is
 `RETROACTIVE`: when a backdated entry lands, days from that value date forward
 are re-evaluated in ascending order and any missing fee is assessed with the
 value date of the day it belongs to.
@@ -197,7 +198,8 @@ are a decomposition of the credit, not six independent roundings.
 
 **The gap.** Not specified anywhere.
 
-**Resolution.** Half away from zero, applied **once**, to the interest total.
+**Resolution.** Half away from zero — `round_half_up` (ledger/money.py:120) —
+applied **once**, to the interest total.
 
 **Why not banker's rounding.** Half-even is the better default when many
 independent values are rounded and the bias matters — but here only one value
@@ -217,7 +219,8 @@ integer division with remainder placement. Nothing else rounds.
 **The gap.** ACC-001's Day 4, Day 5 and Day 6 accruals all have a remainder of
 0.0040. One of them gets the spare fils and the brief does not say which.
 
-**Resolution.** Earliest day wins — Day 4. Same rule for instalment splits:
+**Resolution.** Earliest day wins — Day 4; `apportion` (ledger/money.py:133).
+Same rule for instalment splits:
 the earliest part takes the remainder.
 
 **Why.** Any rule is defensible; only a *deterministic* one lets a rebuild
@@ -250,7 +253,9 @@ fees could not even be denominated.
 **The gap.** The fee schedule says "AED 25.00" flat. ACC-002 is a BHD account.
 No BHD fee, no date convention and no conversion instruction is given.
 
-**Resolution.** The ledger **raises `UndefinedFeeCurrency`** rather than guess.
+**Resolution.** The ledger **raises `UndefinedFeeCurrency`** rather than
+guess, in `_refuse_unchargeable_fees` (ledger/core.py:528), before any fee is
+committed.
 It does not fire on this stream, because ACC-002 never closes negative.
 
 **Why not just convert.** Not because a rate is unavailable — it is. Both the
@@ -425,7 +430,7 @@ account, not three for one day.
 interest accrues over.
 
 **Resolution.** No. All six daily accruals are computed from balances taken
-before the credit is posted.
+before the credit is posted — `capitalize_interest` (ledger/core.py:564).
 
 **Why.** Otherwise the calculation is self-referential: crediting interest
 raises the Day 6 balance, which raises the Day 6 accrual, which raises the
@@ -557,7 +562,8 @@ more: one clearing account per currency taking the other side of ordinary
 credits, debits and matched settlements; a suspense account for the unmatched
 force post; a fee income account; and an interest expense account per
 currency. Nothing in the ledger may post one-sided, and a missing contra
-account raises `NoSuchAccount` rather than being improvised around.
+account raises `NoSuchAccount` rather than being improvised around —
+`_contra` (ledger/core.py:190).
 
 **The one choice inside that worth defending.** The force post's other side
 goes to **suspense, not clearing.** Both are defensible: the scheme has been
