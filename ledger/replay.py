@@ -41,6 +41,7 @@ CHART: Mapping[str, Account] = {
         _account("CLEARING-AED", AED, AccountKind.CLEARING),
         _account("CLEARING-BHD", BHD, AccountKind.CLEARING),
         _account("SUSPENSE-AED", AED, AccountKind.SUSPENSE),
+        _account("SUSPENSE-BHD", BHD, AccountKind.SUSPENSE),
         _account("INCOME-FEES-AED", AED, AccountKind.INCOME),
         _account("EXPENSE-INTEREST-AED", AED, AccountKind.EXPENSE),
         _account("EXPENSE-INTEREST-BHD", BHD, AccountKind.EXPENSE),
@@ -102,13 +103,14 @@ def _line(label: str, rest: str) -> str:
 
 
 def _restated_table(book: Ledger) -> list[str]:
+    customers = book.customers
     rows = [
         f"Restated at end of Day {WINDOW} (all entries, by value date)",
         "-" * 66,
-        "  day  " + "  ".join(_pad(a, 16) for a in CUSTOMERS),
+        "  day  " + "  ".join(_pad(a, 16) for a in customers),
     ]
     for day in range(1, WINDOW + 1):
-        cells = [_pad(str(book.closing_balance(a, day)), 16) for a in CUSTOMERS]
+        cells = [_pad(str(book.closing_balance(a, day)), 16) for a in customers]
         rows.append(f"  {day:>3}  " + "  ".join(cells))
     return rows
 
@@ -116,7 +118,7 @@ def _restated_table(book: Ledger) -> list[str]:
 def _balances(book: Ledger, day: Day) -> list[str]:
     """Both views of the day: how it closed, and how it reads now."""
     rows: list[str] = []
-    for account in CUSTOMERS:
+    for account in book.customers:
         closed = book.snapshots[day][account]
         restated = book.closing_balance(account, day)
         rows.append(_line("closed at", f"{account}  {closed}"))
@@ -174,11 +176,23 @@ def _errors(decisions: list[Decision]) -> list[str]:
 
 def _interest(book: Ledger) -> list[str]:
     rows = ["Interest", "-" * 66]
-    for account in CUSTOMERS:
+    for account in book.customers:
         currency = book.currency_of(account)
         accruals = book.daily_accruals(account)
-        if not any(accruals):
+        earned = any(
+            book.closing_balance(account, day).is_positive
+            for day in range(1, WINDOW + 1)
+        )
+        if not earned:
             rows.append(f"  {account}  no positive closing balance in the window")
+            continue
+        if not any(accruals):
+            # A real balance that accrued less than one minor unit is not the
+            # same fact as never having been in credit, and saying so would be
+            # a false statement about the customer's account.
+            rows.append(
+                f"  {account}  accrued less than one minor unit over the window"
+            )
             continue
         shown = "  ".join(str(Money(a, currency)).split()[0] for a in accruals)
         rows.append(f"  {account}  daily: {shown}")
@@ -213,9 +227,11 @@ def _block(book: Ledger, currency: Currency, account_ids: list[str]) -> list[tup
         (account_id, _amount(book.closing_balance(account_id, WINDOW)))
         for account_id in account_ids
         if book.closing_balance(account_id, WINDOW).minor != 0
-        or account_id in CUSTOMERS
+        or account_id in book.customers
     ]
-    total = Money(book.trial_balance(WINDOW)[currency], currency)
+    # A chart currency that saw no postings is zero, not missing: the
+    # trial balance only carries currencies that actually have entries.
+    total = Money(book.trial_balance(WINDOW).get(currency, 0), currency)
     return [*lines, ("sum", _amount(total))]
 
 
