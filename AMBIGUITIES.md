@@ -471,3 +471,32 @@ ledger balance.
 **Resolution.** No. An authorisation posts nothing at all and lives entirely
 in the hold log. It is the one event type in the model that produces no
 entries, which is why it is also the one that cannot unbalance the book.
+
+
+---
+
+## A24. Does reversing a settlement reopen the authorisation it settled?
+
+**The gap.** E9 reverses a debit, so the stream never asks. The model allows
+it, because reversal is generic over whatever the original event posted.
+
+**Resolution.** No. The money is returned and the authorisation stays
+`SETTLED`; a re-presentment needs a fresh authorisation. The decision record
+says so explicitly rather than leaving it to be discovered from behaviour.
+
+**Why.** Settling consumes an authorisation, and returning the money does not
+un-consume it — the scheme would require a new authorisation for a second
+presentment too. The alternative, reopening the hold, would mean the ledger
+holding funds against an authorisation the acquirer may already consider
+closed.
+
+**Why it is written down rather than just implemented.** Until the review it
+was *accidental*: the reversal path negated the postings and simply never
+touched the hold log, so the right outcome happened for no stated reason. An
+outcome nobody chose is not a policy, and the next person to touch that method
+had nothing telling them which half was deliberate.
+
+**What is still unresolved.** A partial settlement reversal — returning some
+of what was settled — has no answer here, and neither does reversing a
+settlement whose authorisation has since expired. Both need the
+authorisation-lifecycle work listed as a cut in the architecture document.

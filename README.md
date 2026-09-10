@@ -17,7 +17,7 @@ Python 3.12 or newer.
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[test]'
 
-make test      # full suite: 92 pass, 1 xfail (the deliberate one)
+make test      # full suite: 99 pass, 1 xfail (the deliberate one)
 make run       # replay the six days and print the report
 make run-pit   # the same replay under the alternative fee policy
 make gap       # run the failing test unmasked, so it shows red

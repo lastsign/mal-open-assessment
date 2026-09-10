@@ -161,6 +161,41 @@ policies, an unbalanced commit is refused before anything is appended, and a
 chart with nowhere to post the other side fails loudly rather than posting
 one-sided.
 
+**16:37 — code review, and it was worth running.**
+Eight findings, every one reproduced against the code rather than asserted,
+and I disagreed with none of them. Two mattered.
+
+`_commit` — the path whose entire justification is catching bad transactions —
+validated the arithmetic and not the accounts. An AED posting into the BHD
+customer account balances against its own contra, commits, and then breaks
+every later balance query on that account permanently, because the log cannot
+delete. I had written the zero-sum check and stopped there, satisfied, without
+asking what else a posting can be wrong about.
+
+The other one is worse because I had already written it down myself: the
+architecture document names "a close that dies halfway leaves fees
+half-assessed" as a deferred risk, and `close_day` did exactly that — raising
+`UndefinedFeeCurrency` partway through a loop that had already committed
+another customer's fee. I described the failure mode in prose and then shipped
+it in code, in the same repository, the same afternoon. Fixed by deciding the
+whole close before committing any of it.
+
+The rest: the report still read a module-level customer list after I had added
+a chart parameter; a chart currency with no postings crashed the trial balance
+on a missing dict key; the chart had a suspense account in AED but not BHD, so
+the force-post path — the one the assessment exercises — died on the other
+supported currency; and the interest block reported "no positive closing
+balance" for an account that held one and simply earned less than a fils,
+which is a false statement about a customer's money.
+
+Wrote one test per finding first and checked they failed against the unfixed
+code: eight of nine did, the ninth being a guard that the fix does not
+over-fire. Split the fixes across two commits, core and report.
+
+The thing I want to remember from this: every finding was in a path the tests
+did not cover, and I had been reading the coverage as though green meant
+checked. It meant the six days in the brief work.
+
 ---
 
 ## Still to do
