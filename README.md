@@ -6,7 +6,8 @@ web layer, no persistence, no database, no dependencies beyond `pytest`.
 Start with **REJECTED.md** — five of the eight stated acceptance criteria are
 wrong, and that document is the substance of the submission. **AMBIGUITIES.md**
 records every question the brief left open and what each answer costs.
-**NUMBERS.md** covers the constants.
+**NUMBERS.md** covers the constants, and **SOURCES.md** records what the
+jurisdiction-specific claims rest on and where the checked material ends.
 
 ## Running it
 

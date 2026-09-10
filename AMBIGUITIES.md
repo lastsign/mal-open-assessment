@@ -169,19 +169,32 @@ fees could not even be denominated.
 ## A9. In what currency is the overdraft fee charged on a BHD account?
 
 **The gap.** The fee schedule says "AED 25.00" flat. ACC-002 is a BHD account.
-No FX rate, no date convention, no BHD fee is given.
+No BHD fee, no date convention and no conversion instruction is given.
 
 **Resolution.** The ledger **raises `UndefinedFeeCurrency`** rather than guess.
 It does not fire on this stream, because ACC-002 never closes negative.
 
-**Why not just pick a rate.** Inventing an AED/BHD rate would silently answer
-three questions nobody asked: which rate, as of which date, and who takes the
-revaluation. A loud failure on a path the data never exercises is cheaper than
-a plausible number in the ledger.
+**Why not just convert.** Not because a rate is unavailable — it is. Both the
+dirham and the Bahraini dinar are pegged to the US dollar, so an AED/BHD cross
+is administratively determined rather than market-discovered, and I could
+compute one. "There is no rate" would be the weak version of this argument and
+I would not want to make it under questioning.
 
-**What a real answer looks like.** A fee schedule per currency, or a fee
-account denominated in the account's own currency with the AED figure treated
-as the AED-account rate rather than a universal constant.
+The real objection is that converting answers three questions nobody asked. As
+of which date does a value-dated fee convert — its value date, its booking
+date, or the day it is charged? Who carries the revaluation when those differ?
+And is a fee schedule even an FX problem? A charge stated as a round number in
+one currency is a *product* decision; converting it produces BHD 2.560 or
+similar, which is not a price anyone published, has not been disclosed to the
+customer in the manner the CBUAE Consumer Protection Standards require, and
+silently inherits the durability of a currency peg as a dependency of the fee
+schedule. Pegs are policy, not physics — Kuwait left its dollar peg for a
+basket in 2007.
+
+**What a real answer looks like.** A fee schedule with a published figure per
+currency, so that the AED 25.00 is the AED-account price rather than a
+universal constant that happens to be denominated. Conversion is the wrong
+tool for this even when it is available.
 
 ---
 
@@ -337,3 +350,84 @@ is testing. Three entries make the 3.334 / 3.333 / 3.333 split auditable.
 **What is unresolved.** The brief gives no separate value dates for the
 instalments, so all three land on Day 5. If instalments were meant to fall on
 different days, every ACC-002 balance and both of its accruals change.
+
+
+---
+
+## A20. Which licence is this ledger running under?
+
+**The gap.** The brief places the system in a UAE-licensed bank but does not
+say which kind, and in this jurisdiction that is not a detail. A conventional
+licence, an Islamic licence, an Islamic window inside a conventional bank, and
+a licence held inside the Abu Dhabi Global Market are four different rulebooks.
+Two of the brief's own non-negotiable rules do not survive the change.
+
+**Resolution.** Implemented exactly as specified — conventional. The rules were
+given as non-negotiable and nothing in the brief invokes Islamic finance, so
+refusing them would be inventing a requirement rather than finding one. This
+entry exists so the assumption is visible rather than silent.
+
+**What would have to change under an Islamic licence.**
+
+*Daily interest on a positive balance* is riba, and not only because it is
+interest: the deeper problem is that the rate is **known in advance**. A
+current account is structured as *Qard* — an interest-free loan from the
+customer to the bank, principal guaranteed, return zero. Where a return is
+paid the account must be *Mudarabah*: a share of the pool's realised profit,
+declared after the period against a pre-agreed sharing ratio, with the
+depositor carrying capital risk. That is a different data model, not a
+different constant — it needs the pool as a dimension, average or minimum
+balance over the period, tenor weightings, and smoothing reserves. A rate
+applied daily to a balance cannot express it.
+
+*The overdraft fee* is a charge proportional to the duration of a debt, which
+is what its flatness disguises: assessed once per day for as long as the
+balance stays negative, the total is a function of how long the money was owed.
+AAOIFI Shari'ah Standard 19 permits recovering only the direct actual cost of
+servicing a *qard*, tied to neither amount nor duration. A late-payment charge
+is possible under Standards 3 and 8, but as an undertaking to donate: it is
+*gharamah* and goes to charity, not to income. Only *ta'widh* — proven actual
+loss — may be recognised as revenue. For the ledger that means an entry class
+for non-permissible income that can never reach the profit and loss account,
+and a purification account to hold it. That is an architectural requirement,
+not an accounting note.
+
+**What survives unchanged, and one thing that improves.** The append-only log,
+value dating, and exact remainder distribution all hold. The
+available-balance rule holds too, and is arguably more at home here: an account
+that simply cannot go negative is the Shari'ah-compliant outcome. My decision
+to force-post E6 (REJECTED.md) also survives — driving the account negative
+creates an interest-free debt, which is permissible; what is not permissible is
+charging for the time it stays outstanding. And criterion 8 gets a second,
+independent refutation: an unallocated remainder in a Mudarabah pool belongs to
+the pool, so discarding it produces an unattributed balance that a Shari'ah
+audit would raise.
+
+**Which regulator, and why it is not one question.** Onshore, the Higher
+Shari'ah Authority's rulings bind every licensed Islamic institution, and the
+AAOIFI Shari'ah Standards have been mandatory for Islamic banks, Islamic
+windows and finance companies since 1 September 2018. Inside ADGM the FSRA
+applies its own Islamic Finance Rulebook under a common-law framework, with its
+own Shari'a Supervisory Board requirement. "A UAE-licensed bank" is at minimum
+two regulatory perimeters that answer this differently.
+
+Sources for the above are listed in SOURCES.md.
+
+---
+
+## A21. What is a "day"?
+
+**The gap.** The window is Day 1 to Day 6 with no calendar behind it. That
+abstraction is doing more work than it looks.
+
+**Resolution.** Days are opaque ordinals. Nothing in the ledger knows about
+weekends, holidays or calendar systems.
+
+**What it hides.** Value dating in production is expressed in business days,
+and the UAE business week is not the one most systems default to. Profit
+distribution periods are Gregorian while a zakat *hawl* is a lunar year on the
+Hijri calendar, so an institution serving those customers needs the balance as
+at an arbitrary past Hijri date. That last requirement is one this design
+happens to meet well — a value-dated append-only log answers "what was the
+balance on any past date" natively, where a mutable balance column cannot
+answer it at all.

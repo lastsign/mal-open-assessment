@@ -153,6 +153,55 @@ downstream of a closed day becomes mutable with it.
         feature, and in the model as built no event records who chose.
 \end{itemize}
 
+\subsection{If the licence is Islamic}
+
+``A UAE-licensed bank'' is not one regulatory perimeter. Onshore, the Higher
+Shari'ah Authority's rulings bind every licensed Islamic institution, and the
+AAOIFI Shari'ah Standards have been mandatory for Islamic banks, Islamic
+windows of conventional banks and finance companies since 1 September 2018.
+Inside the Abu Dhabi Global Market, the FSRA applies its own Islamic Finance
+Rulebook under a common-law framework with its own Shari'a supervisory
+requirement. The same product gets different answers depending which one it is
+licensed under.
+
+This matters here because two of the rules I was given do not survive the
+change, and neither failure is fixable by adjusting a constant.
+
+A daily rate applied to a positive balance is riba, and the deeper obstacle is
+not the interest but the \term{foreknowledge}: a current account is structured
+as \term{qard}, principal guaranteed and return zero, and where a return is
+paid the account must be \term{mudarabah} --- a share of realised pool profit,
+declared after the period, with the depositor carrying capital risk. A rate
+cannot express that. It requires the pool as a dimension of the ledger, average
+or minimum balance over a period, tenor weightings and smoothing reserves: a
+different data model, not a different number.
+
+An overdraft fee assessed once per day for as long as a balance stays negative
+is proportional to the duration of a debt, which is precisely what its flatness
+disguises. AAOIFI Shari'ah Standard 19 allows recovering the direct actual cost
+of servicing a qard and nothing tied to amount or duration; a late-payment
+charge is possible under Standards 3 and 8, but as an undertaking to donate ---
+\term{gharamah} goes to charity, and only \term{ta'widh}, proven actual loss,
+may be recognised as income. The ledger consequence is structural: an entry
+class for non-permissible income that can never reach profit and loss, and a
+purification account to hold it.
+
+Three things are worth saying in the other direction. The append-only log,
+value dating and exact remainder distribution are all unaffected. The
+available-balance rule is arguably more at home under this licence than the
+conventional one, since an account that cannot go negative is the compliant
+outcome. And force-posting an unmatched settlement survives: driving the
+account negative creates an interest-free debt, which is permitted --- what is
+not permitted is charging for the time it stays outstanding.
+
+I implemented the rules as given, because nothing in the brief invokes Islamic
+finance and refusing a stated rule on my own initiative would be inventing a
+requirement rather than finding one. The point of raising it is that the
+licence question has to be asked before the interest and fee logic is designed,
+not after, and that its answer is not an engineering decision --- it belongs to
+a Shari'ah supervisory committee. Identifying which decisions must leave
+engineering is part of the design work.
+
 \subsection{One control before go-live}
 
 An \textbf{enforced value-date correction window with four-eyes approval and
@@ -265,9 +314,30 @@ original amount added back.
         rate. Deferred risk is a hard failure on a path that a second currency
         pair would reach immediately; the fix is a per-currency schedule, not a
         conversion.
+  \item[A single licence and a single fee schedule assumed.] The interest and
+        fee logic is conventional, and one currency's fee schedule is treated
+        as universal. Deferred risk is that both assumptions are perimeter
+        decisions rather than parameters: an Islamic window or an ADGM licence
+        changes the shape of the interest model rather than its coefficients,
+        and discovering that after the ledger is built is a rewrite, not a
+        migration.
   \item[$O(N)$ balance derivation and no checkpointing.] Deliberate, to keep
         the log the single source of truth while the design was still moving.
         Deferred risk is \S1 in full.
 \end{description}
+
+
+\section*{Sources}
+\small
+Regulatory and Shari'ah claims in \S2 rest on: CBUAE, \textit{Higher Shari'ah
+Authority} and the Rulebook standard on Shari'ah governance; AAOIFI's
+announcement of the UAE's adoption of its standards (mandatory from 1 September
+2018); the ADGM \textit{Islamic Finance Rulebook} and IFR 6.2 on Shari'a
+Supervisory Boards; the CBUAE \textit{Consumer Protection Regulation}
+(Circular 8/2020, issued 31 December 2020) and \textit{Consumer Protection
+Standards}; and AAOIFI Shari'ah Standards 3, 8 and 19 on debt, default and
+qard. Full URLs, the distinction between what was consulted and what is
+asserted from prior knowledge, and the limits of the analysis are recorded in
+\texttt{SOURCES.md} in the repository.
 
 \end{document}

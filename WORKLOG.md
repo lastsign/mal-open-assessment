@@ -79,11 +79,46 @@ Also found that halving the interest rate flips the *sign* of the rounding gap
 
 **14:47 — README and Makefile.** Suite green: 70 passed, 1 xfailed.
 
+**14:48 — architecture document (Part 2), written in LaTeX.**
+Source in `doc/architecture.tex`, built to three pages. LaTeX rather than a
+word processor so the source is diffable in the same history as the code.
+
+**15:22 — jurisdiction pass, and the one thing I nearly shipped wrong.**
+Went back over the money rules against the market the brief actually names.
+Two outcomes.
+
+First, a correction. AMBIGUITIES A9 originally argued that the overdraft fee
+could not be charged on the BHD account because "no FX rate is given". That is
+the weak version and it would not have survived questioning: both the dirham
+and the Bahraini dinar are pegged to the US dollar, so a cross rate is
+administratively determined and I could compute one. Rewrote it around the
+argument that actually holds — a published fee is a product decision, not an
+FX problem, and converting it produces a price nobody disclosed to the
+customer. Same conclusion, defensible reasoning instead of a convenient one.
+
+Second, a genuine finding. The brief places the ledger in a UAE-licensed bank,
+and that is not one regulatory perimeter: onshore under the Higher Shari'ah
+Authority, and inside ADGM under the FSRA's own rulebook, answer differently.
+Two of the brief's own non-negotiable rules do not survive an Islamic licence
+— a rate known in advance cannot be a mudarabah profit share, and a flat fee
+charged daily while a balance is negative is proportional to the duration of a
+debt regardless of being flat. Added as AMBIGUITIES A20 and a subsection of
+§2, and implemented nothing: the rules were given as non-negotiable and
+nothing in the brief invokes Islamic finance, so refusing them would be
+inventing a requirement. Added A21 on the calendar for the same reason.
+
+Deliberately kept short. A long unrequested Shari'ah appendix in an exercise
+that never mentions it reads as scope invention; half a page reads as knowing
+the market. Also created SOURCES.md, which separates what I actually consulted
+from what I asserted from memory — the peg rates and the working-week change
+are in the second list and are quoted nowhere that matters.
+
 ---
 
 ## Still to do
 
-- Architecture & trade-offs document (Part 2).
 - Push to GitHub, verify the URL opens in an incognito window.
 - Re-read REJECTED.md cold before submitting: every refusal has to be one I can
   argue without notes.
+- Read AAOIFI Standards 3, 8 and 19 directly rather than through summaries
+  before defending the §2 argument out loud.
