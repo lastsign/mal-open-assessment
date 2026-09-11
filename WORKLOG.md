@@ -226,10 +226,10 @@ reporting query would take anyway.
 
 ---
 
-## Still to do
+## 2026-09-11
 
-- Push to GitHub, verify the URL opens in an incognito window.
-- Re-read REJECTED.md cold before submitting: every refusal has to be one I can
-  argue without notes.
-- Read AAOIFI Standards 3, 8 and 19 directly rather than through summaries
-  before defending the §2 argument out loud.
+### 16:50 — closed out.
+Pushed to GitHub. Final state: 129 passed, 1 xfailed, the one that is meant
+to be. The to-do list that used to end this file is gone: pushing is done,
+and the rest of it was preparation for the defence rather than work on the
+repository, so it has no business in it.
